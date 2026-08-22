@@ -26,7 +26,7 @@ const DOC_STAGES = [
 ] as const;
 
 function canonicalId(phase: IntakeState["phase"]): (typeof CANONICAL_STEPS)[number]["id"] {
-  if (["language", "consent", "answeredBy", "pathway"].includes(phase)) return "patientState";
+  if (["consent", "answeredBy", "pathway"].includes(phase)) return "patientState";
   if (phase === "socrates") return "chiefComplaint";
   if (phase === "ros") return "clinicalHistory";
   if (phase === "dashavidha") return "dashavidha";

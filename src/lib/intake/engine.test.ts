@@ -48,6 +48,14 @@ function afterPatientState(pathway: IntakeState["pathway"] = "ayush"): IntakeSta
 }
 
 describe("canonical AYUSH spine", () => {
+  it("starts at consent with language already set, not a language picker phase", () => {
+    const state = createInitialState();
+    expect(state.phase).toBe("consent");
+    expect(state.languageCode).toBe("en-IN");
+    expect(createInitialState("hi-IN").languageCode).toBe("hi-IN");
+    expect(createInitialState("hi-IN").phase).toBe("consent");
+  });
+
   it("starts with chief complaint after patient state, not red flags", () => {
     const q = nextQuestion(afterPatientState());
     expect(q.kind).toBe("ask");

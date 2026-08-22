@@ -43,7 +43,8 @@ Public registration is **patient-only**. Other roles are seeded or assigned by a
 
 ## Routes
 
-- `/` — role picker + login
+- `/` — product landing (all features, pipelines, four roles)
+- `/login` — role picker + demo login
 - `/login?role=patient|practitioner|dietitian|admin`
 - `/kiosk` — walk-up intake
 - `/patient` — portal (case taking, symptoms, Ahara-Vihara, plans, adherence, booking, messages)

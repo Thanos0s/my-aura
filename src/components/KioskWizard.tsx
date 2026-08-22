@@ -14,7 +14,7 @@ import {
   isFilled,
   type IntakeState,
 } from "@/lib/intake/engine";
-import { SARVAM_LANGUAGES } from "@/lib/sarvam/languages";
+import { detectSarvamLanguageCode, isDemoGradeLanguage } from "@/lib/sarvam/languages";
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
 import type { DocumentExtractMeta, DocumentKind } from "@/lib/documents/metadata";
 import { DocumentPipelineRail, IntakePipelineRail } from "@/components/PipelineRails";
@@ -72,7 +72,7 @@ export function KioskWizard({
   adapters: KioskAdapters | null;
   boundProfile?: BoundProfile;
 }) {
-  const [state, setState] = useState<IntakeState>(createInitialState);
+  const [state, setState] = useState<IntakeState>(() => createInitialState("en-IN"));
   const [displayName, setDisplayName] = useState(boundProfile?.displayName ?? "Patient");
   const [abhaId, setAbhaId] = useState("");
   const [visitId, setVisitId] = useState<string | null>(null);
@@ -89,15 +89,24 @@ export function KioskWizard({
   const [localDocs, setLocalDocs] = useState<LocalDoc[]>([]);
 
   useEffect(() => {
+    const tags =
+      typeof navigator.languages !== "undefined" && navigator.languages.length > 0
+        ? [...navigator.languages]
+        : [navigator.language];
+    const detected = detectSarvamLanguageCode(tags);
+    setState((s) => (s.phase === "consent" ? { ...s, languageCode: detected } : s));
+  }, []);
+
+  useEffect(() => {
     saveOfflineVisit({ state, displayName, visitId });
   }, [state, displayName, visitId]);
 
   const prompt = useMemo(() => {
-    if (["language", "consent", "answeredBy", "pathway"].includes(state.phase)) return null;
+    if (["consent", "answeredBy", "pathway"].includes(state.phase)) return null;
     return nextQuestion(state);
   }, [state]);
 
-  const clinical = !["language", "consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
+  const clinical = !["consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
 
   async function persist(next: IntakeState, status?: "intake" | "awaiting_patient_confirm" | "escalated") {
     if (!adapters || !visitId) return;
@@ -136,7 +145,7 @@ export function KioskWizard({
       const res = await fetch("/api/sarvam/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, languageCode: state.languageCode || "hi-IN" }),
+        body: JSON.stringify({ text, languageCode: state.languageCode || "en-IN" }),
       });
       const data = (await res.json()) as { audioBase64?: string | null };
       if (data.audioBase64) {
@@ -166,14 +175,17 @@ export function KioskWizard({
       const blob = new Blob(chunks, { type: "audio/webm" });
       const form = new FormData();
       form.set("audio", blob, "speech.webm");
-      form.set("languageCode", state.languageCode || "hi-IN");
+      form.set("languageCode", state.languageCode || "en-IN");
       const stt = await fetch("/api/sarvam/stt", { method: "POST", body: form });
-      const sttJson = (await stt.json()) as { text?: string; error?: string };
+      const sttJson = (await stt.json()) as { text?: string; error?: string; languageCode?: string };
       if (!sttJson.text) {
         setState((s) => ({ ...s, offlineMode: true }));
         setMessage(sttJson.error ?? "Voice unavailable. Use touchscreen chips — same text bus.");
         return;
       }
+      const sttLanguage = sttJson.languageCode
+        ? detectSarvamLanguageCode(sttJson.languageCode)
+        : state.languageCode;
       setTyped(sttJson.text);
       setTextBus(sttJson.text);
       const extracted = await fetch("/api/sarvam/extract", {
@@ -184,9 +196,11 @@ export function KioskWizard({
       const ex = (await extracted.json()) as { extracted?: Record<string, string> };
       if (ex.extracted) {
         setExtractLit(true);
-        const next = applyExtraction(state, ex.extracted);
+        const next = { ...applyExtraction(state, ex.extracted), languageCode: sttLanguage };
         setState(next);
         await persist(next);
+      } else if (sttLanguage !== state.languageCode) {
+        setState((s) => ({ ...s, languageCode: sttLanguage }));
       }
     } catch {
       setState((s) => ({ ...s, offlineMode: true }));
@@ -320,7 +334,6 @@ export function KioskWizard({
     clearOfflineVisit();
   }
 
-  const selectedLang = SARVAM_LANGUAGES.find((l) => l.code === state.languageCode);
   const reviewPending = localDocs.filter((d) => d.reviewRequired).length;
 
   return (
@@ -362,26 +375,6 @@ export function KioskWizard({
   function renderMain() {
     return (
       <>
-      {state.phase === "language" ? (
-        <section className="mt-6 border-t border-graphite pt-6">
-          <p className="tl-overline">Boot sequence</p>
-          <h2 className="mt-1 text-2xl">Choose language</h2>
-          <p className="text-sm text-mist">Hindi and English are demo-grade. Other languages may have weaker ASR.</p>
-          <div className="mt-4 grid max-h-[50vh] grid-cols-2 gap-2 overflow-auto">
-            {SARVAM_LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                className="tl-card p-3 text-left text-lg text-display"
-                onClick={() => setState({ ...state, languageCode: lang.code, phase: "consent" })}
-              >
-                {lang.name}
-                {!lang.demoGrade ? <span className="mt-1 block font-mono text-[10px] tracking-[0.08em] text-warning uppercase">ASR quality may vary</span> : null}
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {state.phase === "consent" ? (
         <section className="mt-6 space-y-3 border-t border-graphite pt-6">
           <p className="tl-overline">Consent</p>
@@ -493,7 +486,7 @@ export function KioskWizard({
               ))}
             </ol>
           ) : null}
-          {selectedLang && !selectedLang.demoGrade ? (
+          {!isDemoGradeLanguage(state.languageCode) ? (
             <p className="mt-1 font-mono text-sm text-warning">ASR for this language may be weaker. Prefer chips if unsure.</p>
           ) : null}
 

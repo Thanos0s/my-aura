@@ -16,7 +16,6 @@ export type Slot = {
 };
 
 export type IntakePhase =
-  | "language"
   | "consent"
   | "answeredBy"
   | "pathway"
@@ -316,10 +315,10 @@ function mapFrom<K extends string>(keys: readonly K[]): Record<K, Slot> {
   return Object.fromEntries(keys.map((k) => [k, emptySlot()])) as Record<K, Slot>;
 }
 
-export function createInitialState(): IntakeState {
+export function createInitialState(languageCode = "en-IN"): IntakeState {
   return {
-    phase: "language",
-    languageCode: "",
+    phase: "consent",
+    languageCode,
     answeredBy: "patient",
     pathway: "allopathic",
     consent: {

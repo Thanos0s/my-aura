@@ -17,8 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My Aura — AYUSH case-taking",
-  description: "AI-assisted patient intake for OPD. Never auto-diagnostic.",
+  title: "My Aura — AYUSH OPD case-taking",
+  description:
+    "Voice and touch patient intake, Dashavidha, OCR review, practitioner-approved care. Never auto-diagnostic.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

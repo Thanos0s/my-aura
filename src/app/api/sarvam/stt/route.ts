@@ -43,6 +43,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = (await response.json()) as { transcript?: string; text?: string };
-  return NextResponse.json({ text: data.transcript ?? data.text ?? "", model: "saaras:v4" });
+  const data = (await response.json()) as {
+    transcript?: string;
+    text?: string;
+    language_code?: string;
+    language?: string;
+  };
+  const detectedLanguage = data.language_code ?? data.language;
+  return NextResponse.json({
+    text: data.transcript ?? data.text ?? "",
+    model: "saaras:v4",
+    ...(detectedLanguage ? { languageCode: detectedLanguage } : {}),
+  });
 }

@@ -88,7 +88,7 @@ export function requireRole<T extends Role>(actual: Role, allowed: readonly T[])
 export type NavItem = { href: string; label: string; hint: string };
 
 export function navForRole(role: Role | null): NavItem[] {
-  const home: NavItem = { href: "/", label: "Boot", hint: "Home" };
+  const home: NavItem = { href: "/", label: "Landing", hint: "Product" };
   const kiosk: NavItem = { href: "/kiosk", label: "Pipeline", hint: "Walk-up kiosk" };
   if (!role) {
     return [
