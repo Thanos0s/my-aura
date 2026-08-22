@@ -88,34 +88,24 @@ export function requireRole<T extends Role>(actual: Role, allowed: readonly T[])
 export type NavItem = { href: string; label: string; hint: string };
 
 export function navForRole(role: Role | null): NavItem[] {
-  const home: NavItem = { href: "/", label: "Landing", hint: "Product" };
-  const kiosk: NavItem = { href: "/kiosk", label: "Pipeline", hint: "Walk-up kiosk" };
-  if (!role) {
-    return [
-      home,
-      kiosk,
-      { href: "/login", label: "Login", hint: "Role stations" },
-      { href: "/staff", label: "Alerts", hint: "Red flags" },
-    ];
-  }
+  if (!role) return [];
   if (role === "patient") {
-    return [home, { href: "/patient", label: "Portal", hint: "Patient" }, kiosk];
+    return [
+      { href: "/patient", label: "Portal", hint: "Home" },
+      { href: "/kiosk", label: "Intake", hint: "Case taking" },
+    ];
   }
   if (role === "practitioner") {
     return [
-      home,
-      { href: "/practitioner", label: "Clinic", hint: "Practitioner" },
+      { href: "/practitioner", label: "Clinic", hint: "Queue" },
       { href: "/staff", label: "Alerts", hint: "Red flags" },
-      kiosk,
     ];
   }
   if (role === "dietitian") {
-    return [home, { href: "/dietitian", label: "Ahara", hint: "Dietitian" }];
+    return [{ href: "/dietitian", label: "Ahara", hint: "Referrals" }];
   }
   return [
-    home,
-    { href: "/admin", label: "Cadence", hint: "Admin" },
-    { href: "/practitioner", label: "Clinic", hint: "Queue" },
+    { href: "/admin", label: "Cadence", hint: "Operations" },
     { href: "/staff", label: "Alerts", hint: "Red flags" },
   ];
 }

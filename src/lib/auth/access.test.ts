@@ -179,5 +179,6 @@ describe("console nav", () => {
 
     const admin = navForRole("admin" as Role).map((n) => n.href);
     expect(admin).toContain("/admin");
+    expect(navForRole(null)).toEqual([]);
   });
 });

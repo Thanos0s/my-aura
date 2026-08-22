@@ -56,7 +56,7 @@ export const LANDING_FEATURES: LandingFeature[] = [
   {
     overline: "Language",
     title: "Multilingual kiosk",
-    copy: "All Saaras languages in the picker. Hindi and Indian English are demo-grade; others carry an ASR warning.",
+    copy: "Language is detected from the browser (and speech). No language picker. Hindi and Indian English are demo-grade.",
   },
   {
     overline: "Safety",
@@ -112,25 +112,25 @@ export const LANDING_FEATURES: LandingFeature[] = [
 
 export const LANDING_ROLES = [
   {
-    href: "/login?role=patient",
+    href: "/login/patient",
     overline: "A",
     title: "Patient",
     copy: "Case taking, symptoms, documents, diet, plans, adherence, booking, messages.",
   },
   {
-    href: "/login?role=practitioner",
+    href: "/login/doctor",
     overline: "B",
     title: "Ayurveda practitioner",
     copy: "Patient list, AI summary, Dashavidha, reports, care plans. Final clinical authority.",
   },
   {
-    href: "/login?role=dietitian",
+    href: "/login/staff",
     overline: "C",
     title: "Dietitian / nutritionist",
     copy: "Referrals only. Dietary history, meal plans, adherence, report to practitioner.",
   },
   {
-    href: "/login?role=admin",
+    href: "/login/admin",
     overline: "D",
     title: "Admin",
     copy: "Users, permissions, knowledge base, documents, audit, analytics, issues.",

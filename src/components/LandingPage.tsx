@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LoginPanel } from "@/components/LoginPanel";
 import {
   CASE_SPINE,
   DASHAVIDHA_FACTORS,
@@ -40,15 +39,43 @@ export function LandingPage() {
           before the consult. The practitioner approves every clinical field. The model never diagnoses.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/kiosk" className="btn-pulse px-6 py-3">
-            Open walk-up kiosk
+          <Link href="/login/patient" className="btn-pulse px-6 py-3">
+            Patient login
           </Link>
-          <Link href="/login" className="btn-ghost px-6 py-3">
-            Enter console
+          <Link href="/login/doctor" className="btn-ghost px-6 py-3">
+            Practitioner login
+          </Link>
+          <Link href="/login/admin" className="btn-ghost px-6 py-3">
+            Admin login
+          </Link>
+          <Link href="/kiosk" className="btn-ghost px-6 py-3">
+            Walk-up kiosk
           </Link>
         </div>
         <p className="mt-6 font-mono text-[11px] tracking-[0.12em] text-ash uppercase">
           Never auto-diagnostic · Practitioner has final authority
+        </p>
+      </section>
+
+      <section id="how-it-works" className="border-b border-graphite px-4 py-14 md:px-10">
+        <p className="tl-overline">Website flow</p>
+        <h2 className="mt-2 text-3xl">How you move through My Aura</h2>
+        <ol className="mt-8 grid gap-3 md:grid-cols-4">
+          {[
+            { n: "01", t: "Landing", d: "See every capability. No login required." },
+            { n: "02", t: "Login", d: "Patient or admin first. Clinic staff use a separate gate." },
+            { n: "03", t: "Your station", d: "Patient portal, admin cadence, or clinic consoles." },
+            { n: "04", t: "Care loop", d: "Intake → practitioner review → dietitian if referred → follow-up." },
+          ].map((step) => (
+            <li key={step.n} className="tl-card p-5">
+              <p className="tl-overline">{step.n}</p>
+              <p className="mt-2 text-xl text-display">{step.t}</p>
+              <p className="mt-2 text-mist">{step.d}</p>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-6 text-sm text-ash">
+          Walk-up kiosk skips login for floor intake, then the practitioner still approves the record.
         </p>
       </section>
 
@@ -102,7 +129,7 @@ export function LandingPage() {
         <div className="mt-8 grid gap-3 lg:grid-cols-2">
           {LANDING_ROLES.map((role) => (
             <Link
-              key={role.href}
+              key={role.overline}
               href={role.href}
               className="tl-card block p-5 transition-colors hover:border-pulse"
             >
@@ -127,13 +154,19 @@ export function LandingPage() {
       </section>
 
       <section className="px-4 py-14 md:px-10">
-        <p className="tl-overline">Demo login</p>
-        <h2 className="mt-2 text-3xl">Seed, then PIN 1234</h2>
-        <p className="mt-2 mb-6 max-w-xl text-mist">
-          patient@, practitioner@, dietitian@, admin@aura.local. Convex must be running. Walk-up kiosk needs
-          no account.
-        </p>
-        <LoginPanel />
+        <p className="tl-overline">Start</p>
+        <h2 className="mt-2 text-3xl">Pick a gate</h2>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/login/patient" className="btn-pulse px-6 py-3">
+            Patient login
+          </Link>
+          <Link href="/login/doctor" className="btn-ghost px-6 py-3">
+            Practitioner login
+          </Link>
+          <Link href="/login/admin" className="btn-ghost px-6 py-3">
+            Admin login
+          </Link>
+        </div>
       </section>
     </div>
   );

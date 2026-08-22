@@ -1,7 +1,8 @@
 "use client";
 
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
+import { useAuthFromFirebase } from "@/lib/firebase/useAuthFromFirebase";
 
 const url = process.env.NEXT_PUBLIC_CONVEX_URL;
 const client = url ? new ConvexReactClient(url) : null;
@@ -12,5 +13,9 @@ export function convexConfigured(): boolean {
 
 export function Providers({ children }: { children: ReactNode }) {
   if (!client) return children;
-  return <ConvexProvider client={client}>{children}</ConvexProvider>;
+  return (
+    <ConvexProviderWithAuth client={client} useAuth={useAuthFromFirebase}>
+      {children}
+    </ConvexProviderWithAuth>
+  );
 }

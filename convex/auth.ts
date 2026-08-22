@@ -20,6 +20,33 @@ const userReturn = v.object({
   active: v.boolean(),
 });
 
+type PublicUser = {
+  _id: Id<"users">;
+  email: string;
+  role: "patient" | "practitioner" | "dietitian" | "admin";
+  displayName: string;
+  patientId?: Id<"patients">;
+  active: boolean;
+};
+
+function toPublicUser(user: {
+  _id: Id<"users">;
+  email: string;
+  role: PublicUser["role"];
+  displayName: string;
+  patientId?: Id<"patients">;
+  active: boolean;
+}): PublicUser {
+  return {
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+    displayName: user.displayName,
+    patientId: user.patientId,
+    active: user.active,
+  };
+}
+
 const DEMO = [
   { email: "patient@aura.local", role: "patient" as const, displayName: "Demo Patient" },
   { email: "practitioner@aura.local", role: "practitioner" as const, displayName: "Demo Practitioner" },
@@ -129,16 +156,93 @@ export const login = mutation({
       .withIndex("by_email", (q) => q.eq("email", email))
       .unique();
     if (!user || !user.active) throw new Error("Invalid email or PIN");
+    if (!user.pinHash) {
+      throw new Error("This account uses Firebase. Sign in with email and password.");
+    }
     const pinHash = await hashPin(args.pin);
     if (pinHash !== user.pinHash) throw new Error("Invalid email or PIN");
-    return {
-      _id: user._id,
-      email: user.email,
-      role: user.role,
-      displayName: user.displayName,
-      patientId: user.patientId,
-      active: user.active,
-    };
+    return toPublicUser(user);
+  },
+});
+
+export const ensureFromFirebase = mutation({
+  args: {
+    intendedRole: v.union(
+      v.literal("patient"),
+      v.literal("practitioner"),
+      v.literal("dietitian")
+    ),
+    displayName: v.optional(v.string()),
+  },
+  returns: userReturn,
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const email = identity.email?.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      throw new Error("Firebase account has no email");
+    }
+    const firebaseUid = identity.subject;
+    const tokenIdentifier = identity.tokenIdentifier;
+
+    const byToken = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", tokenIdentifier))
+      .unique();
+    const byFirebase = await ctx.db
+      .query("users")
+      .withIndex("by_firebase", (q) => q.eq("firebaseUid", firebaseUid))
+      .unique();
+    const byEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+
+    const existing = byToken ?? byFirebase ?? byEmail;
+    if (existing) {
+      if (!existing.active) throw new Error("Account is inactive");
+      if (existing.firebaseUid && existing.firebaseUid !== firebaseUid) {
+        throw new Error("This email is already linked to a different Firebase user");
+      }
+      await ctx.db.patch(existing._id, {
+        firebaseUid,
+        tokenIdentifier,
+        email,
+      });
+      const updated = await ctx.db.get(existing._id);
+      if (!updated) throw new Error("User not found");
+      return toPublicUser(updated);
+    }
+
+    const now = Date.now();
+    const displayName =
+      args.displayName?.trim() || identity.name?.trim() || email.split("@")[0] || "User";
+    let patientId: Id<"patients"> | undefined;
+    if (args.intendedRole === "patient") {
+      patientId = await ctx.db.insert("patients", {
+        displayName,
+        languageCode: "en-IN",
+        createdAt: now,
+      });
+    }
+    const userId = await ctx.db.insert("users", {
+      email,
+      firebaseUid,
+      tokenIdentifier,
+      role: args.intendedRole,
+      displayName,
+      patientId,
+      active: true,
+      createdAt: now,
+    });
+    if (patientId) {
+      await ctx.db.patch(patientId, { userId });
+    }
+    const created = await ctx.db.get(userId);
+    if (!created) throw new Error("User not found");
+    return toPublicUser(created);
   },
 });
 

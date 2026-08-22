@@ -22,7 +22,9 @@ export default defineSchema({
 
   users: defineTable({
     email: v.string(),
-    pinHash: v.string(),
+    pinHash: v.optional(v.string()),
+    firebaseUid: v.optional(v.string()),
+    tokenIdentifier: v.optional(v.string()),
     role,
     displayName: v.string(),
     patientId: v.optional(v.id("patients")),
@@ -31,7 +33,9 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_role", ["role"])
-    .index("by_patient", ["patientId"]),
+    .index("by_patient", ["patientId"])
+    .index("by_firebase", ["firebaseUid"])
+    .index("by_token", ["tokenIdentifier"]),
 
   visits: defineTable({
     patientId: v.id("patients"),
