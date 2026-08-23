@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { FloatingTerminalButton } from "@/components/FloatingTerminalButton";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <ConsoleShell>{children}</ConsoleShell>
         </Providers>
+        <FloatingTerminalButton />
       </body>
     </html>
   );
 }
+
