@@ -53,8 +53,11 @@ export function PatientStation({
   const messages = useQuery(api.messaging.listMessages, args);
   const visits = useQuery(api.visits.listPatientVisits, args);
   const documentExtracts = useQuery(api.documents.listPatientDocumentExtracts, args);
-  const allFoods = useQuery(api.foods.listFoods, {});
-
+  // Only load food database when user navigates to the food browser — prevents crashing other pages
+  const allFoods = useQuery(
+    api.foods.listFoods,
+    tab === "plans" ? {} : "skip"
+  );
 
   // Smart default tab: new patient (no visits) → AI Case Taking; returning patient → Dashboard
   useEffect(() => {
