@@ -180,7 +180,15 @@ export function KioskWizard({
       const sttJson = (await stt.json()) as { text?: string; error?: string; languageCode?: string };
       if (!sttJson.text) {
         setState((s) => ({ ...s, offlineMode: true }));
-        setMessage(sttJson.error ?? "Voice unavailable. Use touchscreen chips — same text bus.");
+        const detail =
+          typeof (sttJson as { detail?: unknown }).detail === "string"
+            ? (sttJson as { detail: string }).detail.slice(0, 180)
+            : "";
+        setMessage(
+          detail
+            ? `${sttJson.error ?? "Voice unavailable"}: ${detail}`
+            : (sttJson.error ?? "Voice unavailable. Use touchscreen chips — same text bus.")
+        );
         return;
       }
       const sttLanguage = sttJson.languageCode

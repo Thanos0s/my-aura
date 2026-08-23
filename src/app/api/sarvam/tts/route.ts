@@ -7,6 +7,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ audioBase64: null, mode: "unavailable" });
   }
 
+  const text = (body.text ?? "").trim();
+  if (!text) {
+    return NextResponse.json({ audioBase64: null, mode: "empty" });
+  }
+
   const response = await fetch("https://api.sarvam.ai/text-to-speech", {
     method: "POST",
     headers: {
@@ -14,14 +19,17 @@ export async function POST(request: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      text: body.text ?? "",
-      target_language_code: body.languageCode ?? "hi-IN",
+      text,
       model: "bulbul:v3",
+      language_code: body.languageCode ?? "hi-IN",
+      speaker: "shubh",
     }),
   });
 
   if (!response.ok) {
-    return NextResponse.json({ audioBase64: null, mode: "failed" }, { status: 502 });
+    const detail = await response.text();
+    console.error("Bulbul TTS failed", response.status, detail);
+    return NextResponse.json({ audioBase64: null, mode: "failed", detail }, { status: 502 });
   }
 
   const data = (await response.json()) as { audios?: string[]; audio?: string };
