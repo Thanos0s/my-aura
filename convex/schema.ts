@@ -22,7 +22,6 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_phone", ["phoneNumber"]),
 
-
   users: defineTable({
     email: v.string(),
     pinHash: v.optional(v.string()),
@@ -186,6 +185,7 @@ export default defineSchema({
     referralId: v.id("referrals"),
     title: v.string(),
     notes: v.string(),
+    structuredPlan: v.optional(v.string()),
     practitionerApproved: v.boolean(),
     shareable: v.boolean(),
     createdAt: v.number(),
@@ -232,7 +232,6 @@ export default defineSchema({
   })
     .index("by_patient", ["patientId"])
     .index("by_practitioner", ["practitionerUserId"]),
-
 
   messages: defineTable({
     patientId: v.id("patients"),
@@ -309,4 +308,25 @@ export default defineSchema({
     body: v.string(),
     createdAt: v.number(),
   }).index("by_patient", ["patientId"]),
+
+  foods: defineTable({
+    name: v.string(),
+    category: v.string(),
+    dosha: v.object({
+      vata: v.string(),
+      pitta: v.string(),
+      kapha: v.string(),
+    }),
+    taste: v.array(v.string()),
+    energy: v.string(),
+    description: v.string(),
+    nutrition: v.object({
+      calories: v.string(),
+      protein: v.string(),
+      carbs: v.string(),
+      fat: v.string(),
+    }),
+    bestSeason: v.array(v.string()),
+    imageUrl: v.string(),
+  }),
 });

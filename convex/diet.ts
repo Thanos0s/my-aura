@@ -4,6 +4,17 @@ import { getUserSafely, openReferralFor, requireRole, requireUser, writeAudit } 
 
 const session = { sessionUserId: v.union(v.id("users"), v.string()) };
 
+export const addFoodItems = mutation({
+  args: {
+    items: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    for (const item of args.items) {
+      await ctx.db.insert("foods", item);
+    }
+    return true;
+  },
+});
 
 export const referToDietitian = mutation({
   args: {
@@ -108,6 +119,7 @@ export const saveDietPlan = mutation({
     notes: v.string(),
     shareable: v.boolean(),
     planId: v.optional(v.id("dietPlans")),
+    structuredPlan: v.optional(v.string()),
   },
   returns: v.id("dietPlans"),
   handler: async (ctx, args) => {
@@ -125,6 +137,7 @@ export const saveDietPlan = mutation({
         notes: args.notes,
         shareable: args.shareable,
         updatedAt: now,
+        ...(args.structuredPlan !== undefined ? { structuredPlan: args.structuredPlan } : {}),
       });
       return args.planId;
     }
@@ -134,6 +147,7 @@ export const saveDietPlan = mutation({
       referralId: ref._id,
       title: args.title,
       notes: args.notes,
+      structuredPlan: args.structuredPlan,
       practitionerApproved: false,
       shareable: args.shareable,
       createdAt: now,
@@ -188,6 +202,7 @@ export const listDietPlans = query({
       _id: v.id("dietPlans"),
       title: v.string(),
       notes: v.string(),
+      structuredPlan: v.optional(v.string()),
       practitionerApproved: v.boolean(),
       shareable: v.boolean(),
       createdAt: v.number(),
@@ -242,6 +257,7 @@ export const listDietPlans = query({
         _id: p._id,
         title: p.title,
         notes: p.notes,
+        structuredPlan: p.structuredPlan,
         practitionerApproved: p.practitionerApproved,
         shareable: p.shareable,
         createdAt: p.createdAt,

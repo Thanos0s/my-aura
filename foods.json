@@ -1,0 +1,299 @@
+[
+  {
+    "name": "Rice (Basmati)",
+    "category": "Grains",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "increase"
+    },
+    "taste": [
+      "sweet"
+    ],
+    "energy": "cold",
+    "description": "Ideal for balancing Vata and Pitta, but should be consumed in moderation by Kapha types.",
+    "nutrition": {
+      "calories": "358",
+      "protein": "7.1g",
+      "carbs": "78g",
+      "fat": "0.7g"
+    },
+    "bestSeason": [
+      "All Seasons"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Turmeric (Haldi)",
+    "category": "Spices",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": [
+      "bitter",
+      "pungent"
+    ],
+    "energy": "hot",
+    "description": "Powerful anti-inflammatory and digestive aid. Natural antiseptic properties.",
+    "nutrition": {
+      "calories": "354",
+      "protein": "7.8g",
+      "carbs": "64.9g",
+      "fat": "9.9g"
+    },
+    "bestSeason": [
+      "All Seasons"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Coconut",
+    "category": "Fruits",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "increase"
+    },
+    "taste": [
+      "sweet"
+    ],
+    "energy": "cold",
+    "description": "Cooling and nourishing. Excellent for Pitta types and summer consumption.",
+    "nutrition": {
+      "calories": "354",
+      "protein": "3.3g",
+      "carbs": "15.2g",
+      "fat": "33.5g"
+    },
+    "bestSeason": [
+      "Summer",
+      "Monsoon"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Ginger (Adrak)",
+    "category": "Spices",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": [
+      "pungent"
+    ],
+    "energy": "hot",
+    "description": "Universal medicine. Enhances digestion and circulation.",
+    "nutrition": {
+      "calories": "80",
+      "protein": "1.8g",
+      "carbs": "17.8g",
+      "fat": "0.8g"
+    },
+    "bestSeason": [
+      "Monsoon",
+      "Winter"
+    ],
+    "imageUrl": "data:image/svg+xml;base64,CiAgICAgICAgICAgICAgICAgIDxzdmcgd2lkdGg9IjIwMCIgaGVpZ2h0PSIxNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICAgICAgICAgICAgICAgICAgPHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIxNjAiIGZpbGw9IiNmMGZkZjQiLz4KICAgICAgICAgICAgICAgICAgICA8cmVjdCB4PSI1MCIgeT0iNDAiIHdpZHRoPSIxMDAiIGhlaWdodD0iODAiIHJ4PSIxMCIgZmlsbD0iIzEwYjk4MSIvPgogICAgICAgICAgICAgICAgICAgIDx0ZXh0IHg9IjEwMCIgeT0iODUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTIiPgogICAgICAgICAgICAgICAgICAgICAgR2luZ2VyIChBZHJhaykKICAgICAgICAgICAgICAgICAgICA8L3RleHQ+CiAgICAgICAgICAgICAgICAgIDwvc3ZnPgogICAgICAgICAgICAgICAg"
+  },
+  {
+    "name": "Almonds (Badam)",
+    "category": "Nuts",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "increase"
+    },
+    "taste": [
+      "sweet"
+    ],
+    "energy": "hot",
+    "description": "Brain tonic and strength enhancer. Best consumed soaked overnight.",
+    "nutrition": {
+      "calories": "579",
+      "protein": "21.2g",
+      "carbs": "21.6g",
+      "fat": "49.9g"
+    },
+    "bestSeason": [
+      "Winter"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1508747703725-719777637510?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Cucumber (Khira)",
+    "category": "Vegetables",
+    "dosha": {
+      "vata": "increase",
+      "pitta": "decrease",
+      "kapha": "neutral"
+    },
+    "taste": [
+      "sweet",
+      "astringent"
+    ],
+    "energy": "cold",
+    "description": "Extremely cooling and hydrating. Perfect for hot weather and Pitta pacification.",
+    "nutrition": {
+      "calories": "16",
+      "protein": "0.7g",
+      "carbs": "3.6g",
+      "fat": "0.1g"
+    },
+    "bestSeason": [
+      "Summer"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1604977042946-1eecc30f269e?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Lemon (Nimbu)",
+    "category": "Fruits",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": [
+      "sour"
+    ],
+    "energy": "hot",
+    "description": "Digestive stimulant and vitamin C source. Use in moderation for Pitta types.",
+    "nutrition": {
+      "calories": "29",
+      "protein": "1.1g",
+      "carbs": "9.3g",
+      "fat": "0.3g"
+    },
+    "bestSeason": [
+      "All Seasons"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1590736969955-71cc94901144?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Honey (Madhu)",
+    "category": "Sweeteners",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": [
+      "sweet",
+      "astringent"
+    ],
+    "energy": "hot",
+    "description": "Natural antibiotic and energy source. Never heat honey above body temperature.",
+    "nutrition": {
+      "calories": "304",
+      "protein": "0.3g",
+      "carbs": "82.4g",
+      "fat": "0g"
+    },
+    "bestSeason": [
+      "Winter"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1587049016823-c90df8b67e44?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Spinach (Palak)",
+    "category": "Vegetables",
+    "dosha": {
+      "vata": "increase",
+      "pitta": "decrease",
+      "kapha": "neutral"
+    },
+    "taste": [
+      "sweet",
+      "astringent"
+    ],
+    "energy": "cold",
+    "description": "Rich in iron and vitamins. Cook with warming spices for Vata types.",
+    "nutrition": {
+      "calories": "23",
+      "protein": "2.9g",
+      "carbs": "3.6g",
+      "fat": "0.4g"
+    },
+    "bestSeason": [
+      "Winter"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Ghee (Clarified Butter)",
+    "category": "Dairy",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "increase"
+    },
+    "taste": [
+      "sweet"
+    ],
+    "energy": "cold",
+    "description": "Sacred food in Ayurveda. Enhances digestion and nourishes all tissues.",
+    "nutrition": {
+      "calories": "900",
+      "protein": "0.3g",
+      "carbs": "0g",
+      "fat": "99.5g"
+    },
+    "bestSeason": [
+      "All Seasons"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1563379091339-03246963d96a?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Mung Dal (Green Gram)",
+    "category": "Legumes",
+    "dosha": {
+      "vata": "neutral",
+      "pitta": "decrease",
+      "kapha": "decrease"
+    },
+    "taste": [
+      "sweet",
+      "astringent"
+    ],
+    "energy": "cold",
+    "description": "Easiest pulse to digest. Ideal for detoxification and recovery.",
+    "nutrition": {
+      "calories": "347",
+      "protein": "24.5g",
+      "carbs": "59g",
+      "fat": "1.2g"
+    },
+    "bestSeason": [
+      "All Seasons"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1631016300708-6c540da7e50d?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Pomegranate (Anar)",
+    "category": "Fruits",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "neutral"
+    },
+    "taste": [
+      "sweet",
+      "sour",
+      "astringent"
+    ],
+    "energy": "cold",
+    "description": "Heart tonic and blood purifier. Balances all three doshas when ripe.",
+    "nutrition": {
+      "calories": "83",
+      "protein": "1.7g",
+      "carbs": "18.7g",
+      "fat": "1.2g"
+    },
+    "bestSeason": [
+      "Winter"
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1553575606-d8658308ca8e?w=300&h=200&fit=crop&auto=format&q=60"
+  }
+]

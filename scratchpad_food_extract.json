@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Rice (Basmati)",
+    "category": "Grains",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "increase"
+    },
+    "taste": ["sweet"],
+    "energy": "cold",
+    "description": "Ideal for balancing Vata and Pitta, but should be consumed in moderation by Kapha types.",
+    "nutrition": {
+      "calories": 358,
+      "protein": "7.1g",
+      "carbs": "78g",
+      "fat": "0.7g"
+    },
+    "bestSeason": ["All Seasons"],
+    "imageUrl": "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Turmeric (Haldi)",
+    "category": "Spices",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": ["bitter", "pungent"],
+    "energy": "hot",
+    "description": "Powerful anti-inflammatory and digestive aid. Natural antiseptic properties.",
+    "nutrition": {
+      "calories": 354,
+      "protein": "7.8g",
+      "carbs": "64.9g",
+      "fat": "9.9g"
+    },
+    "bestSeason": ["All Seasons"],
+    "imageUrl": "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Coconut",
+    "category": "Fruits",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "decrease",
+      "kapha": "increase"
+    },
+    "taste": ["sweet"],
+    "energy": "cold",
+    "description": "Cooling and nourishing. Excellent for Pitta types and summer consumption.",
+    "nutrition": {
+      "calories": 354,
+      "protein": "3.3g",
+      "carbs": "15.2g",
+      "fat": "33.5g"
+    },
+    "bestSeason": ["Summer", "Monsoon"],
+    "imageUrl": "https://images.unsplash.com/photo-1589820296156-2454bb8a6ad1?w=300&h=200&fit=crop&auto=format&q=60"
+  },
+  {
+    "name": "Ginger (Adrak)",
+    "category": "Spices",
+    "dosha": {
+      "vata": "decrease",
+      "pitta": "increase",
+      "kapha": "decrease"
+    },
+    "taste": ["pungent"],
+    "energy": "hot",
+    "description": "Universal medicine. Enhances digestion and circulation.",
+    "nutrition": {
+      "calories": 80,
+      "protein": "1.8g",
+      "carbs": "17.8g",
+      "fat": "0.8g"
+    },
+    "bestSeason": ["Monsoon", "Winter"],
+    "imageUrl": "data:image/svg+xml;base64,(embedded placeholder image)"
+  }
+]

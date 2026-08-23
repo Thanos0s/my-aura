@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -27,9 +27,7 @@ export function PatientStation({
   displayName: string;
   intake: ReactNode;
 }) {
-  // null = still loading visits; "intake" for new patients; "overview" for returning
-  const [tab, setTab] = useState<Tab | null>(null);
-  const [tabDecided, setTabDecided] = useState(false);
+  const [tab, setTab] = useState<Tab>("overview");
   const [selectedDosha, setSelectedDosha] = useState<"vata" | "pitta" | "kapha" | "dashavidha">("vata");
   const [activeDay, setActiveDay] = useState<"Sat" | "Sun" | "Mon" | "Tue" | "Wed">("Mon");
   const [routineDone, setRoutineDone] = useState<Record<string, boolean>>({ "pull-up": true });
@@ -48,28 +46,6 @@ export function PatientStation({
   const visits = useQuery(api.visits.listPatientVisits, args);
   const documentExtracts = useQuery(api.documents.listPatientDocumentExtracts, args);
 
-  // Smart default tab: new patient (no visits) → AI Case Taking; returning patient → Dashboard
-  useEffect(() => {
-    if (tabDecided) return;
-    if (visits === undefined) return; // still loading
-    setTabDecided(true);
-    if (visits.length === 0) {
-      // Brand-new patient: start AI case taking immediately
-      setTab("intake");
-    } else {
-      // Returning patient: show the full dashboard
-      setTab("overview");
-    }
-  }, [visits, tabDecided]);
-
-  // Convenience setter that forces a tab (respects user clicks)
-  function goTab(t: Tab) {
-    setTabDecided(true);
-    setTab(t);
-  }
-
-  const activeTab = tab ?? "overview"; // fallback while loading
-
   const logSymptom = useMutation(api.clinical.logSymptom);
   const upsertLifestyle = useMutation(api.clinical.upsertLifestyle);
   const logAdherence = useMutation(api.clinical.logAdherence);
@@ -79,7 +55,6 @@ export function PatientStation({
   const attachDocument = useMutation(api.documents.attachDocument);
   const startVisit = useMutation(api.visits.startVisit);
   const updateName = useMutation(api.auth.updateProfileName);
-
 
   const [symptomText, setSymptomText] = useState("");
   const [severity, setSeverity] = useState(3);
@@ -278,7 +253,7 @@ export function PatientStation({
             <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
           </div>
           <button
-            onClick={() => goTab("intake")}
+            onClick={() => setTab("intake")}
             className="btn-pulse px-4 py-2 text-xs font-semibold"
           >
             Start Case Taking ✨
@@ -304,20 +279,19 @@ export function PatientStation({
           <button
             key={id}
             className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-              activeTab === id
+              tab === id
                 ? "bg-[#1b343f] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
-            onClick={() => goTab(id)}
+            onClick={() => setTab(id)}
           >
-
             {label}
           </button>
         ))}
       </div>
 
       {/* TAB 1: MINDNEST DASHBOARD OVERVIEW */}
-      {activeTab === "overview" ? (
+      {tab === "overview" ? (
         <div className="space-y-6">
           {/* Top Row: Hero Banner & Health Overview */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -345,7 +319,7 @@ export function PatientStation({
                 </p>
                 <div className="pt-2">
                   <button
-                    onClick={() => goTab("intake")}
+                    onClick={() => setTab("intake")}
                     className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-5 py-2.5 text-xs font-semibold transition-all border border-white/30 shadow-xs"
                   >
                     Join Now
@@ -408,7 +382,7 @@ export function PatientStation({
 
               <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
                 <button
-                  onClick={() => goTab("intake")}
+                  onClick={() => setTab("intake")}
                   className="rounded-full bg-[#cde4f0] hover:bg-[#b8daec] text-slate-900 px-4 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5"
                 >
                   Improve Health ✨
@@ -474,7 +448,7 @@ export function PatientStation({
                   <p className="text-2xl font-bold text-slate-900">1858 <span className="text-xs font-normal text-slate-500">Kcl</span></p>
                   <p className="text-[11px] text-slate-400">Balanced Ahara intake today</p>
                 </div>
-                <button onClick={() => goTab("lifestyle")} className="text-xs font-semibold text-sky-700 hover:underline">
+                <button onClick={() => setTab("lifestyle")} className="text-xs font-semibold text-sky-700 hover:underline">
                   Log meal →
                 </button>
               </div>
@@ -604,7 +578,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 2: AI CASE TAKING (Intake) */}
-      {activeTab === "intake" ? (
+      {tab === "intake" ? (
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
           <div className="border-b border-slate-100 pb-3">
             <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Ayurvedic Case Taking</p>
@@ -618,7 +592,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 3: PHYSICAL DOCUMENTS & OCR PIPELINE */}
-      {activeTab === "documents" ? (
+      {tab === "documents" ? (
         <section className="space-y-4">
           <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
             <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Physical Documents & OCR</p>
@@ -638,7 +612,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 4: SYMPTOMS TIMELINE */}
-      {activeTab === "symptoms" ? (
+      {tab === "symptoms" ? (
         <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Symptom Log</h2>
@@ -686,7 +660,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 5: AHARA-VIHARA LIFESTYLE */}
-      {activeTab === "lifestyle" ? (
+      {tab === "lifestyle" ? (
         <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Ahara-Vihara (Diet & Daily Regimen)</h2>
@@ -735,7 +709,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 6: CARE & DIET PLANS */}
-      {activeTab === "plans" ? (
+      {tab === "plans" ? (
         <section className="grid gap-6 md:grid-cols-2">
           <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
             <h2 className="text-lg font-bold text-slate-900">Practitioner-Approved Care</h2>
@@ -774,7 +748,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 7: ADHERENCE CHECK-INS */}
-      {activeTab === "adherence" ? (
+      {tab === "adherence" ? (
         <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Daily Adherence Check-In</h2>
@@ -812,7 +786,7 @@ export function PatientStation({
       ) : null}
 
       {/* TAB 8: BOOK FOLLOW-UP */}
-      {activeTab === "book" ? (
+      {tab === "book" ? (
         <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4 max-w-xl">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Book Follow-up Consultation</h2>
@@ -1064,7 +1038,7 @@ export function PatientStation({
 
 
       {/* TAB 9: MESSAGES */}
-      {activeTab === "messages" ? (
+      {tab === "messages" ? (
         <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
           <div className="flex items-center justify-between">
             <div>

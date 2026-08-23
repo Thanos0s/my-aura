@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { convexConfigured } from "@/app/providers";
 import { RoleGate, useAuraSession } from "@/components/useAuraSession";
+import type { DietPlanExtraction } from "@/lib/diet/extract";
 
 export default function DietitianPage() {
   if (!convexConfigured()) {
@@ -50,6 +51,54 @@ function DietitianApp() {
   const [progress, setProgress] = useState("");
   const [msg, setMsg] = useState("");
   const [planId, setPlanId] = useState<Id<"dietPlans"> | null>(null);
+  const [structuringId, setStructuringId] = useState<Id<"dietPlans"> | null>(null);
+
+  const structuredByPlanId = new Map<string, DietPlanExtraction>();
+  for (const p of plans ?? []) {
+    if (!p.structuredPlan) continue;
+    try {
+      structuredByPlanId.set(p._id, JSON.parse(p.structuredPlan) as DietPlanExtraction);
+    } catch {
+      // ignore malformed stored JSON
+    }
+  }
+  const imageKeys = Array.from(
+    new Set(
+      Array.from(structuredByPlanId.values()).flatMap((d) =>
+        d.daily_schedule.flatMap((m) => m.food_items.map((f) => f.image_search_key))
+      )
+    )
+  );
+  const foodImages = useQuery(api.foods.findImagesByKeys, imageKeys.length ? { keys: imageKeys } : "skip");
+
+  async function handleStructurePlan(
+    p: { _id: Id<"dietPlans">; title: string; notes: string; meals: Array<{ label: string; itemsText: string }> }
+  ) {
+    setStructuringId(p._id);
+    try {
+      const res = await fetch("/api/diet/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: p.title,
+          notes: p.notes,
+          meals: p.meals.map((m) => ({ label: m.label, itemsText: m.itemsText })),
+        }),
+      });
+      const { extracted } = (await res.json()) as { extracted: DietPlanExtraction };
+      await savePlan({
+        sessionUserId: sessionUserId!,
+        patientId: patientId!,
+        title: p.title,
+        notes: p.notes,
+        shareable,
+        planId: p._id,
+        structuredPlan: JSON.stringify(extracted),
+      });
+    } finally {
+      setStructuringId(null);
+    }
+  }
 
   if (!sessionUserId) return null;
 
@@ -162,21 +211,106 @@ function DietitianApp() {
                 </button>
               </div>
 
-              {plans?.map((p) => (
-                <article key={p._id} className="mt-3 p-4 rounded-xl bg-white border border-slate-200">
-                  <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
-                    {p.practitionerApproved ? "practitioner approved" : "draft"}
-                  </span>
-                  <h4 className="font-bold text-xs text-slate-900 mt-1">{p.title}</h4>
-                  <div className="mt-1 space-y-0.5">
-                    {p.meals.map((m) => (
-                      <p key={m._id} className="font-mono text-xs text-slate-700">
-                        <span className="font-semibold">{m.label}:</span> {m.itemsText}
-                      </p>
-                    ))}
-                  </div>
-                </article>
-              ))}
+              {plans?.map((p) => {
+                const structured = structuredByPlanId.get(p._id);
+                return (
+                  <article key={p._id} className="mt-3 p-4 rounded-xl bg-white border border-slate-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
+                        {p.practitionerApproved ? "practitioner approved" : "draft"}
+                      </span>
+                      <button
+                        className="btn-ghost px-3 py-1 text-[10px] font-semibold disabled:opacity-50"
+                        disabled={structuringId === p._id || p.meals.length === 0}
+                        onClick={() => handleStructurePlan(p)}
+                      >
+                        {structuringId === p._id ? "Structuring…" : "✨ AI Structure Plan"}
+                      </button>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-900 mt-1">{p.title}</h4>
+                    <div className="mt-1 space-y-0.5">
+                      {p.meals.map((m) => (
+                        <p key={m._id} className="font-mono text-xs text-slate-700">
+                          <span className="font-semibold">{m.label}:</span> {m.itemsText}
+                        </p>
+                      ))}
+                    </div>
+
+                    {structured && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">
+                          Structured Plan
+                        </p>
+                        {structured.target_daily_macros && (
+                          <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-600">
+                            {structured.target_daily_macros.calories_kcal != null && (
+                              <span className="bg-slate-100 rounded-full px-2 py-0.5">
+                                {structured.target_daily_macros.calories_kcal} kcal
+                              </span>
+                            )}
+                            {structured.target_daily_macros.protein_g != null && (
+                              <span className="bg-slate-100 rounded-full px-2 py-0.5">
+                                P {structured.target_daily_macros.protein_g}g
+                              </span>
+                            )}
+                            {structured.target_daily_macros.carbs_g != null && (
+                              <span className="bg-slate-100 rounded-full px-2 py-0.5">
+                                C {structured.target_daily_macros.carbs_g}g
+                              </span>
+                            )}
+                            {structured.target_daily_macros.fats_g != null && (
+                              <span className="bg-slate-100 rounded-full px-2 py-0.5">
+                                F {structured.target_daily_macros.fats_g}g
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {structured.daily_schedule.map((meal, i) => (
+                          <div key={i}>
+                            <p className="text-xs font-bold text-slate-800">
+                              {meal.meal_time}
+                              {meal.time_suggestion ? ` · ${meal.time_suggestion}` : ""}
+                            </p>
+                            <ul className="mt-1 grid gap-1.5 sm:grid-cols-2">
+                              {meal.food_items.map((item, j) => {
+                                const imgUrl = foodImages?.[item.image_search_key];
+                                return (
+                                  <li
+                                    key={j}
+                                    className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 p-1.5"
+                                  >
+                                    {imgUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={imgUrl}
+                                        alt={item.item_name}
+                                        className="h-8 w-8 rounded-md object-cover shrink-0"
+                                      />
+                                    ) : (
+                                      <span className="h-8 w-8 rounded-md bg-slate-200 shrink-0 flex items-center justify-center text-[10px]">
+                                        🍽️
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-slate-700 leading-tight">
+                                      {item.item_name}
+                                      {item.portion_size ? ` (${item.portion_size})` : ""}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ))}
+                        {structured.foods_to_avoid.length > 0 && (
+                          <p className="text-[11px] text-rose-700">
+                            <span className="font-bold">Avoid:</span> {structured.foods_to_avoid.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </section>
 
             <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
