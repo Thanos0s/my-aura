@@ -101,11 +101,6 @@ export function LoginPanel({
     displayName: string;
     patientId?: string | null;
   }) {
-    if (!roleAllowedAtStation(user.role, station)) {
-      throw new Error(
-        `This ${station} gate does not accept the ${user.role} role. Use the matching login page.`
-      );
-    }
     writeSession({
       userId: user._id,
       role: user.role,
@@ -114,6 +109,22 @@ export function LoginPanel({
       patientId: user.patientId ?? null,
     });
     const dest = HOME_FOR[user.role];
+
+    if (!roleAllowedAtStation(user.role, station)) {
+      setNotice(
+        `Logged in as ${user.displayName} (${user.role}). Redirecting to ${dest}…`
+      );
+      window.setTimeout(() => {
+        router.replace(dest);
+        window.setTimeout(() => {
+          if (window.location.pathname !== dest) {
+            window.location.assign(dest);
+          }
+        }, 200);
+      }, 400);
+      return;
+    }
+
     router.replace(dest);
     window.setTimeout(() => {
       if (window.location.pathname !== dest) {
@@ -194,11 +205,17 @@ export function LoginPanel({
       commitSession(user);
     } catch (e) {
       clearSession();
-      setNotice(e instanceof Error ? e.message : "Login failed");
+      const msg = e instanceof Error ? e.message : "Login failed";
+      if (msg.includes("Invalid email or PIN")) {
+        setNotice("Invalid email or PIN. If this is a fresh setup, click 'Seed demo users' below (PIN: 1234).");
+      } else {
+        setNotice(msg);
+      }
     } finally {
       setBusy(false);
     }
   }
+
 
   const showRegister = canRegister && mode === "register";
   const firebaseMode = firebaseOn && !usePin;
