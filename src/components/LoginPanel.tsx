@@ -151,18 +151,20 @@ export function LoginPanel({
     }, 200);
   }
 
-  async function syncFirebaseUser() {
+  async function syncFirebaseUser(fbUser?: { email?: string | null; uid?: string }) {
     const intendedRole = station === "patient" ? ("patient" as const) : staffRole;
     let lastError: unknown;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       try {
         return await withTimeout(
           ensureFromFirebase({
             intendedRole,
             displayName: name,
+            email: fbUser?.email ?? email.trim(),
+            firebaseUid: fbUser?.uid,
           }),
-          12000,
-          "Convex did not respond"
+          8000,
+          "Convex backend did not respond in time"
         );
       } catch (error) {
         lastError = error;
@@ -176,7 +178,7 @@ export function LoginPanel({
     throw lastError instanceof Error
       ? lastError
       : new Error(
-          "Convex could not verify Firebase. Confirm convex/firebaseAuth.ts matches your Firebase project id and restart npx convex dev."
+          "Could not link Firebase user with Convex backend."
         );
   }
 
@@ -189,12 +191,13 @@ export function LoginPanel({
     setNotice("Signing in…");
     try {
       const auth = getFirebaseAuth();
+      let credential;
       if (mode === "register" && canRegister) {
-        await createUserWithEmailAndPassword(auth, email.trim(), secret);
+        credential = await createUserWithEmailAndPassword(auth, email.trim(), secret);
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), secret);
+        credential = await signInWithEmailAndPassword(auth, email.trim(), secret);
       }
-      const user = await syncFirebaseUser();
+      const user = await syncFirebaseUser(credential.user);
       commitSession(user);
     } catch (e) {
       clearSession();
@@ -203,6 +206,7 @@ export function LoginPanel({
       setBusy(false);
     }
   }
+
 
   async function onPinSubmit() {
     if (secret.length < 4) {

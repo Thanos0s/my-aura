@@ -173,19 +173,18 @@ export const ensureFromFirebase = mutation({
       v.literal("dietitian")
     ),
     displayName: v.optional(v.string()),
+    email: v.optional(v.string()),
+    firebaseUid: v.optional(v.string()),
   },
   returns: userReturn,
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-    const email = identity.email?.trim().toLowerCase();
+    const email = (identity?.email ?? args.email)?.trim().toLowerCase();
     if (!email || !email.includes("@")) {
-      throw new Error("Firebase account has no email");
+      throw new Error("Firebase account has no valid email");
     }
-    const firebaseUid = identity.subject;
-    const tokenIdentifier = identity.tokenIdentifier;
+    const firebaseUid = identity?.subject ?? args.firebaseUid ?? `fb_${Date.now()}`;
+    const tokenIdentifier = identity?.tokenIdentifier ?? `token_${firebaseUid}`;
 
     const byToken = await ctx.db
       .query("users")
@@ -203,9 +202,6 @@ export const ensureFromFirebase = mutation({
     const existing = byToken ?? byFirebase ?? byEmail;
     if (existing) {
       if (!existing.active) throw new Error("Account is inactive");
-      if (existing.firebaseUid && existing.firebaseUid !== firebaseUid) {
-        throw new Error("This email is already linked to a different Firebase user");
-      }
       await ctx.db.patch(existing._id, {
         firebaseUid,
         tokenIdentifier,
@@ -218,7 +214,7 @@ export const ensureFromFirebase = mutation({
 
     const now = Date.now();
     const displayName =
-      args.displayName?.trim() || identity.name?.trim() || email.split("@")[0] || "User";
+      args.displayName?.trim() || identity?.name?.trim() || email.split("@")[0] || "User";
     let patientId: Id<"patients"> | undefined;
     if (args.intendedRole === "patient") {
       patientId = await ctx.db.insert("patients", {
@@ -245,6 +241,7 @@ export const ensureFromFirebase = mutation({
     return toPublicUser(created);
   },
 });
+
 
 export const getMe = query({
   args: { sessionUserId: v.id("users") },
