@@ -203,19 +203,43 @@ export const ensureFromFirebase = mutation({
     const existing = byToken ?? byFirebase ?? byEmail;
     if (existing) {
       if (!existing.active) throw new Error("Account is inactive");
-      await ctx.db.patch(existing._id, {
+      
+      // Update display name if a customized one was provided and previous was generic
+      const patchData: Record<string, any> = {
         firebaseUid,
         tokenIdentifier,
         email,
-      });
+      };
+      if (
+        args.displayName &&
+        args.displayName.trim() &&
+        (existing.displayName.startsWith("New ") || existing.displayName === "User")
+      ) {
+        patchData.displayName = args.displayName.trim();
+      }
+
+      await ctx.db.patch(existing._id, patchData);
+      if (patchData.displayName && existing.patientId) {
+        await ctx.db.patch(existing.patientId, { displayName: patchData.displayName });
+      }
+
       const updated = await ctx.db.get(existing._id);
       if (!updated) throw new Error("User not found");
       return toPublicUser(updated);
     }
 
     const now = Date.now();
-    const displayName =
-      args.displayName?.trim() || identity?.name?.trim() || email.split("@")[0] || "User";
+    const cleanRawName = args.displayName?.trim();
+    const emailPrefix = email.split("@")[0] || "User";
+    const formattedEmailName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+    
+    let displayName = cleanRawName;
+    if (!displayName || displayName === "New practitioner" || displayName === "New patient") {
+      displayName =
+        identity?.name?.trim() ||
+        (args.intendedRole === "practitioner" ? `Dr. ${formattedEmailName}` : formattedEmailName);
+    }
+
     let patientId: Id<"patients"> | undefined;
     if (args.intendedRole === "patient") {
       patientId = await ctx.db.insert("patients", {
@@ -240,6 +264,32 @@ export const ensureFromFirebase = mutation({
     const created = await ctx.db.get(userId);
     if (!created) throw new Error("User not found");
     return toPublicUser(created);
+  },
+});
+
+export const updateProfileName = mutation({
+  args: {
+    sessionUserId: v.union(v.id("users"), v.string()),
+    displayName: v.string(),
+  },
+  returns: userReturn,
+  handler: async (ctx, args) => {
+    const normalized = ctx.db.normalizeId("users", args.sessionUserId);
+    if (!normalized) throw new Error("User not found");
+    const user = await ctx.db.get(normalized);
+    if (!user) throw new Error("User not found");
+
+    const cleanName = args.displayName.trim();
+    if (!cleanName) throw new Error("Name cannot be empty");
+
+    await ctx.db.patch(user._id, { displayName: cleanName });
+    if (user.patientId) {
+      await ctx.db.patch(user.patientId, { displayName: cleanName });
+    }
+
+    const updated = await ctx.db.get(user._id);
+    if (!updated) throw new Error("User not found");
+    return toPublicUser(updated as any);
   },
 });
 
@@ -313,16 +363,30 @@ export const listPractitioners = query({
       .query("users")
       .withIndex("by_role", (q) => q.eq("role", "practitioner"))
       .take(50);
-    return rows
-      .filter((u) => u.active)
-      .map((user) => ({
+    
+    // Deduplicate by displayName or email, and exclude mistaken "New patient"
+    const seen = new Set<string>();
+    const unique: PublicUser[] = [];
+
+    for (const user of rows) {
+      if (!user.active) continue;
+      if (user.displayName.trim().toLowerCase() === "new patient") continue;
+
+      const key = `${user.displayName.toLowerCase().trim()}_${user.email.toLowerCase().trim()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      unique.push({
         _id: user._id,
         email: user.email,
         role: user.role,
         displayName: user.displayName,
         patientId: user.patientId,
         active: user.active,
-      }));
+      });
+    }
+
+    return unique;
   },
 });
 
@@ -348,4 +412,5 @@ export const listDietitians = query({
       }));
   },
 });
+
 

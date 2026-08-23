@@ -54,6 +54,7 @@ export function PatientStation({
   const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
   const attachDocument = useMutation(api.documents.attachDocument);
   const startVisit = useMutation(api.visits.startVisit);
+  const updateName = useMutation(api.auth.updateProfileName);
 
   const [symptomText, setSymptomText] = useState("");
   const [severity, setSeverity] = useState(3);
@@ -73,6 +74,9 @@ export function PatientStation({
   const [phone, setPhone] = useState("");
   const [sendWhatsAppAlert, setSendWhatsAppAlert] = useState(true);
   const [bookingNotice, setBookingNotice] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [customName, setCustomName] = useState(displayName);
+
 
 
 
@@ -184,11 +188,55 @@ export function PatientStation({
       {/* Top Header / Greeting Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
         <div>
-          <p className="text-sm font-medium text-slate-500">Good Day, {displayName}</p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          <div className="flex items-center gap-2">
+            {isEditingName ? (
+              <div className="flex items-center gap-1.5 py-0.5">
+                <input
+                  type="text"
+                  className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-sky-500"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Enter full name"
+                  autoFocus
+                />
+                <button
+                  className="rounded-lg bg-[#1b343f] px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-[#274d5d]"
+                  onClick={async () => {
+                    if (!customName.trim()) return;
+                    await updateName({ sessionUserId, displayName: customName.trim() });
+                    setIsEditingName(false);
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                  onClick={() => setIsEditingName(false)}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
+                Good Day, <strong className="text-slate-900">{displayName}</strong>
+                <button
+                  className="text-xs text-sky-700 hover:text-sky-900 font-normal px-1 py-0.5 rounded-md hover:bg-sky-50 transition-colors"
+                  onClick={() => {
+                    setCustomName(displayName);
+                    setIsEditingName(true);
+                  }}
+                  title="Change profile name"
+                >
+                  ✎ Edit
+                </button>
+              </p>
+            )}
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 mt-0.5">
             How&apos;s your health balance today?
           </h1>
         </div>
+
 
         <div className="flex items-center gap-3">
           <div className="relative">

@@ -85,11 +85,12 @@ export function LoginPanel({
   const defaultEmail = allowed[0]?.email ?? "patient@aura.local";
   const [email, setEmail] = useState(defaultEmail);
   const [secret, setSecret] = useState(firebaseOn ? "" : "1234");
-  const [name, setName] = useState(station === "staff" ? "New practitioner" : "New patient");
+  const [name, setName] = useState("");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [staffRole, setStaffRole] = useState<"practitioner" | "dietitian">(
     staffSignupRole === "dietitian" ? "dietitian" : "practitioner"
   );
+
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [usePin, setUsePin] = useState(!firebaseOn);
@@ -183,6 +184,10 @@ export function LoginPanel({
   }
 
   async function onFirebaseSubmit() {
+    if (mode === "register" && canRegister && !name.trim()) {
+      setNotice("Please enter your full name to register.");
+      return;
+    }
     if (secret.length < 6) {
       setNotice("Password must be at least 6 characters.");
       return;
@@ -207,8 +212,11 @@ export function LoginPanel({
     }
   }
 
-
   async function onPinSubmit() {
+    if (mode === "register" && station === "patient" && !name.trim()) {
+      setNotice("Please enter your full name to register.");
+      return;
+    }
     if (secret.length < 4) {
       setNotice("PIN must be at least 4 characters.");
       return;
@@ -237,6 +245,7 @@ export function LoginPanel({
       setBusy(false);
     }
   }
+
 
 
   const showRegister = canRegister && mode === "register";
@@ -380,10 +389,23 @@ export function LoginPanel({
 
       {showRegister ? (
         <label className="block">
-          <span className="text-xs font-semibold text-slate-700">Display Name</span>
-          <input className="tl-input mt-1" value={name} onChange={(e) => setName(e.target.value)} />
+          <span className="text-xs font-semibold text-slate-700">
+            {station === "staff"
+              ? "Your Full Name (e.g. Dr. Rajesh Sharma, MD)"
+              : "Your Full Name (e.g. Rajesh Kumar)"}
+          </span>
+          <input
+            className="tl-input mt-1"
+            placeholder={
+              station === "staff" ? "Dr. Full Name / Title" : "Patient Full Name"
+            }
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         </label>
       ) : null}
+
 
       {showRegister && station === "staff" && staffSignupRole === "choose" ? (
         <label className="block">

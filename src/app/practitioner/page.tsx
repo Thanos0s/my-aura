@@ -62,6 +62,7 @@ function PractitionerApp() {
   const approveDiet = useMutation(api.diet.approveDietPlan);
   const setAppt = useMutation(api.clinical.setAppointmentStatus);
   const sendMessage = useMutation(api.messaging.sendMessage);
+  const updateName = useMutation(api.auth.updateProfileName);
   const [viewMode, setViewMode] = useState<"split" | "desk" | "pipeline">("split");
   const [notice, setNotice] = useState("");
   const [note, setNote] = useState("");
@@ -69,6 +70,9 @@ function PractitionerApp() {
   const [careBody, setCareBody] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [msg, setMsg] = useState("");
+  const [isEditingDocName, setIsEditingDocName] = useState(false);
+  const [docNameInput, setDocNameInput] = useState("");
+
 
   const patientId = detail?.visit.patientId ?? patientFilter;
   const chartArgs =
@@ -246,8 +250,55 @@ function PractitionerApp() {
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold">OPD Desk</p>
           <h1 className="text-xl font-bold text-slate-900">Practitioner Console</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Final authority. Never auto-diagnostic.</p>
+          
+          <div className="mt-1">
+            {isEditingDocName ? (
+              <div className="flex items-center gap-1.5 pt-1">
+                <input
+                  type="text"
+                  className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-sky-500 w-full"
+                  value={docNameInput}
+                  onChange={(e) => setDocNameInput(e.target.value)}
+                  placeholder="e.g. Dr. Rajesh Sharma"
+                  autoFocus
+                />
+                <button
+                  className="rounded-lg bg-[#1b343f] px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-[#274d5d]"
+                  onClick={async () => {
+                    if (!docNameInput.trim() || !sessionUserId) return;
+                    await updateName({ sessionUserId, displayName: docNameInput.trim() });
+                    setIsEditingDocName(false);
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                  onClick={() => setIsEditingDocName(false)}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 border border-slate-200/70 rounded-xl px-2.5 py-1 mt-1.5">
+                <span className="font-semibold text-slate-800 truncate">
+                  👨‍⚕️ {doctorName}
+                </span>
+                <button
+                  className="text-[11px] text-sky-700 hover:text-sky-900 font-medium px-1 rounded hover:bg-sky-100 transition-colors shrink-0 ml-1"
+                  onClick={() => {
+                    setDocNameInput(doctorName);
+                    setIsEditingDocName(true);
+                  }}
+                  title="Change doctor name"
+                >
+                  ✎ Edit
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
 
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Patients</p>
