@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { SessionSnapshot } from "@/lib/auth/session";
 import Link from "next/link";
-import { readSession, SESSION_EVENT } from "@/lib/auth/session";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { readSession, clearSession, SESSION_EVENT } from "@/lib/auth/session";
 
 export function useAuraSession() {
   const [session, setSession] = useState<SessionSnapshot | null>(null);
@@ -31,7 +33,18 @@ export function RoleGate({
   label: string;
 }) {
   const session = useAuraSession();
-  if (!session) {
+  const remoteUser = useQuery(
+    api.auth.getMe,
+    session ? { sessionUserId: session.userId } : "skip"
+  );
+
+  useEffect(() => {
+    if (session && remoteUser === null) {
+      clearSession();
+    }
+  }, [session, remoteUser]);
+
+  if (!session || remoteUser === null) {
     return (
       <main className="px-4 py-8 md:px-8">
         <p className="tl-overline">Auth</p>
@@ -64,3 +77,4 @@ export function RoleGate({
   }
   return <>{children}</>;
 }
+

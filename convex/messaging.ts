@@ -1,10 +1,10 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { openReferralFor, requireUser } from "./lib/rbac";
+import { getUserSafely, openReferralFor, requireUser } from "./lib/rbac";
 
 export const sendMessage = mutation({
   args: {
-    sessionUserId: v.id("users"),
+    sessionUserId: v.union(v.id("users"), v.string()),
     patientId: v.optional(v.id("patients")),
     visitId: v.optional(v.id("visits")),
     toRole: v.union(v.literal("practitioner"), v.literal("dietitian"), v.literal("patient")),
@@ -42,7 +42,7 @@ export const sendMessage = mutation({
 
 export const listMessages = query({
   args: {
-    sessionUserId: v.id("users"),
+    sessionUserId: v.union(v.id("users"), v.string()),
     patientId: v.optional(v.id("patients")),
   },
   returns: v.array(
@@ -56,21 +56,30 @@ export const listMessages = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     let patientId = args.patientId;
     if (user.role === "patient") {
-      if (!user.patientId) throw new Error("Patient record missing");
       patientId = user.patientId;
+      if (!patientId) {
+        const p = await ctx.db
+          .query("patients")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+        patientId = p?._id;
+      }
     } else if (!patientId) {
-      throw new Error("patientId required");
+      return [];
     } else if (user.role === "dietitian") {
       const ref = await openReferralFor(ctx, patientId, user._id);
-      if (!ref) throw new Error("Unauthorized: no referral");
+      if (!ref) return [];
     }
+    if (!patientId) return [];
     const rows = await ctx.db
       .query("messages")
-      .withIndex("by_patient", (q) => q.eq("patientId", patientId!))
+      .withIndex("by_patient", (q) => q.eq("patientId", patientId))
       .take(80);
+
     const out = [];
     for (const row of rows) {
       const from = await ctx.db.get(row.fromUserId);

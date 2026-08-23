@@ -1,7 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { hashPin } from "./lib/pin";
-import { requireRole, requireUser, writeAudit } from "./lib/rbac";
+import { requireRole, writeAudit } from "./lib/rbac";
+
 import type { Id } from "./_generated/dataModel";
 
 const roleValidator = v.union(
@@ -244,10 +245,12 @@ export const ensureFromFirebase = mutation({
 
 
 export const getMe = query({
-  args: { sessionUserId: v.id("users") },
+  args: { sessionUserId: v.union(v.id("users"), v.string()) },
   returns: v.union(userReturn, v.null()),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
+    const normalized = ctx.db.normalizeId("users", args.sessionUserId);
+    if (!normalized) return null;
+    const user = await ctx.db.get(normalized);
     if (!user || !user.active) return null;
     return {
       _id: user._id,
@@ -261,7 +264,7 @@ export const getMe = query({
 });
 
 export const listUsers = query({
-  args: { sessionUserId: v.id("users") },
+  args: { sessionUserId: v.union(v.id("users"), v.string()) },
   returns: v.array(userReturn),
   handler: async (ctx, args) => {
     await requireRole(ctx, args.sessionUserId, ["admin"]);
@@ -279,7 +282,7 @@ export const listUsers = query({
 
 export const setUserRole = mutation({
   args: {
-    sessionUserId: v.id("users"),
+    sessionUserId: v.union(v.id("users"), v.string()),
     targetUserId: v.id("users"),
     role: roleValidator,
     active: v.optional(v.boolean()),
@@ -301,10 +304,11 @@ export const setUserRole = mutation({
 });
 
 export const listPractitioners = query({
-  args: { sessionUserId: v.id("users") },
+  args: { sessionUserId: v.union(v.id("users"), v.string()) },
   returns: v.array(userReturn),
   handler: async (ctx, args) => {
-    await requireUser(ctx, args.sessionUserId);
+    const normalized = ctx.db.normalizeId("users", args.sessionUserId);
+    if (!normalized) return [];
     const rows = await ctx.db
       .query("users")
       .withIndex("by_role", (q) => q.eq("role", "practitioner"))
@@ -323,10 +327,11 @@ export const listPractitioners = query({
 });
 
 export const listDietitians = query({
-  args: { sessionUserId: v.id("users") },
+  args: { sessionUserId: v.union(v.id("users"), v.string()) },
   returns: v.array(userReturn),
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
+    const normalized = ctx.db.normalizeId("users", args.sessionUserId);
+    if (!normalized) return [];
     const rows = await ctx.db
       .query("users")
       .withIndex("by_role", (q) => q.eq("role", "dietitian"))
@@ -343,3 +348,4 @@ export const listDietitians = query({
       }));
   },
 });
+

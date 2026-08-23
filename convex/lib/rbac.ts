@@ -3,20 +3,42 @@ import type { Doc, Id } from "../_generated/dataModel";
 
 export type Role = Doc<"users">["role"];
 
+export function normalizeUserId(
+  ctx: QueryCtx | MutationCtx,
+  sessionUserId: string
+): Id<"users"> | null {
+  return ctx.db.normalizeId("users", sessionUserId);
+}
+
 export async function requireUser(
   ctx: QueryCtx | MutationCtx,
-  sessionUserId: Id<"users">
+  sessionUserId: string
 ): Promise<Doc<"users">> {
-  const user = await ctx.db.get(sessionUserId);
+  const normalized = normalizeUserId(ctx, sessionUserId);
+  if (!normalized) {
+    throw new Error("Invalid session user");
+  }
+  const user = await ctx.db.get(normalized);
   if (!user || !user.active) {
     throw new Error("Not authenticated");
   }
   return user;
 }
 
+export async function getUserSafely(
+  ctx: QueryCtx | MutationCtx,
+  sessionUserId: string
+): Promise<Doc<"users"> | null> {
+  const normalized = normalizeUserId(ctx, sessionUserId);
+  if (!normalized) return null;
+  const user = await ctx.db.get(normalized);
+  if (!user || !user.active) return null;
+  return user;
+}
+
 export async function requireRole(
   ctx: QueryCtx | MutationCtx,
-  sessionUserId: Id<"users">,
+  sessionUserId: string,
   allowed: readonly Role[]
 ): Promise<Doc<"users">> {
   const user = await requireUser(ctx, sessionUserId);
@@ -25,6 +47,7 @@ export async function requireRole(
   }
   return user;
 }
+
 
 export async function writeAudit(
   ctx: MutationCtx,

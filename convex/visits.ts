@@ -2,7 +2,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { GENESIS_HASH, hashVisitRecord } from "./lib/hash";
-import { requireRole } from "./lib/rbac";
+import { getUserSafely, requireRole } from "./lib/rbac";
+
 
 const statusValidator = v.union(
   v.literal("intake"),
@@ -422,22 +423,25 @@ export const visitDetail = query({
 
 export const listPatientVisits = query({
   args: {
-    sessionUserId: v.id("users"),
+    sessionUserId: v.union(v.id("users"), v.string()),
     patientId: v.optional(v.id("patients")),
   },
   returns: v.array(visitReturn),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, [
-      "patient",
-      "practitioner",
-      "admin",
-    ]);
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     let patientId = args.patientId;
     if (user.role === "patient") {
-      if (!user.patientId) throw new Error("Patient record missing");
       patientId = user.patientId;
+      if (!patientId) {
+        const p = await ctx.db
+          .query("patients")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+        patientId = p?._id;
+      }
     }
-    if (!patientId) throw new Error("patientId required");
+    if (!patientId) return [];
     return await ctx.db
       .query("visits")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -447,7 +451,7 @@ export const listPatientVisits = query({
 });
 
 export const getAyurvedaAssessment = query({
-  args: { sessionUserId: v.id("users"), visitId: v.id("visits") },
+  args: { sessionUserId: v.union(v.id("users"), v.string()), visitId: v.id("visits") },
   returns: v.union(
     v.object({
       interpretation: v.string(),
@@ -456,7 +460,8 @@ export const getAyurvedaAssessment = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user || (user.role !== "practitioner" && user.role !== "admin")) return null;
     const rows = await ctx.db
       .query("ayurvedaAssessments")
       .withIndex("by_visit", (q) => q.eq("visitId", args.visitId))
@@ -466,6 +471,7 @@ export const getAyurvedaAssessment = query({
     return { interpretation: row.interpretation, updatedAt: row.updatedAt };
   },
 });
+
 
 export const analytics = query({
   args: {},

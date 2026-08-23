@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireRole } from "./lib/rbac";
+import { getUserSafely, requireRole } from "./lib/rbac";
+
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -71,7 +72,7 @@ export const reviewExtract = mutation({
 
 export const listPatientDocumentExtracts = query({
   args: {
-    sessionUserId: v.id("users"),
+    sessionUserId: v.union(v.id("users"), v.string()),
     patientId: v.optional(v.id("patients")),
   },
   returns: v.array(
@@ -87,10 +88,11 @@ export const listPatientDocumentExtracts = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) throw new Error("Not authenticated");
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     const targetPatientId = args.patientId ?? user.patientId;
     if (!targetPatientId) return [];
+
 
     const visits = await ctx.db
       .query("visits")

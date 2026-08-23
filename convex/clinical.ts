@@ -1,9 +1,10 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { openReferralFor, requireRole, requireUser, writeAudit } from "./lib/rbac";
+import { getUserSafely, openReferralFor, requireRole, requireUser, writeAudit } from "./lib/rbac";
 import type { Id } from "./_generated/dataModel";
 
-const session = { sessionUserId: v.id("users") };
+const session = { sessionUserId: v.union(v.id("users"), v.string()) };
+
 
 export const logSymptom = mutation({
   args: {
@@ -42,10 +43,11 @@ export const listSymptoms = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return [];
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
     if (!patientId) return [];
+
     const rows = await ctx.db
       .query("symptomLogs")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -118,8 +120,8 @@ export const getLifestyle = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return null;
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return null;
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
     if (!patientId) return null;
     const rows = await ctx.db
@@ -198,8 +200,8 @@ export const listCarePlans = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return [];
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
     if (!patientId) return [];
     const rows = await ctx.db
@@ -253,14 +255,15 @@ export const listAdherence = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return [];
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
     if (!patientId) return [];
     const rows = await ctx.db
       .query("adherenceLogs")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
       .order("desc")
+
       .take(60);
     return rows.map((r) => ({
       _id: r._id,
@@ -331,8 +334,9 @@ export const listAppointments = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return [];
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
+
     if (user.role === "practitioner") {
       const rows = await ctx.db
         .query("appointments")

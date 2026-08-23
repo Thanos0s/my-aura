@@ -1,8 +1,9 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { openReferralFor, requireRole, requireUser, writeAudit } from "./lib/rbac";
+import { getUserSafely, openReferralFor, requireRole, requireUser, writeAudit } from "./lib/rbac";
 
-const session = { sessionUserId: v.id("users") };
+const session = { sessionUserId: v.union(v.id("users"), v.string()) };
+
 
 export const referToDietitian = mutation({
   args: {
@@ -200,8 +201,9 @@ export const listDietPlans = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.sessionUserId);
-    if (!user || !user.active) return [];
+    const user = await getUserSafely(ctx, args.sessionUserId);
+    if (!user) return [];
+
     let patientId = args.patientId;
     if (user.role === "patient") {
       patientId = user.patientId;
