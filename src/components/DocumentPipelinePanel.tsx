@@ -91,6 +91,41 @@ export function DocumentPipelinePanel({
       return JSON.parse(jsonStr) as {
         kind?: string;
         handwritingLikely?: boolean;
+        // Prescription Schema
+        patient_details?: { name?: string | null; age?: string | number | null; gender?: string | null };
+        doctor_details?: { name?: string | null; specialty?: string | null };
+        vitals?: { blood_pressure?: string | null; weight?: string | null };
+        diagnoses?: string[];
+        medications?: Array<{
+          drug_name: string;
+          dosage?: string;
+          frequency?: string;
+          duration?: string;
+          instructions?: string;
+        }>;
+        follow_up_advice?: string | null;
+        // Lab Schema
+        patient_name?: string | null;
+        collection_date?: string | null;
+        lab_name?: string | null;
+        test_results?: Array<{
+          biomarker_name: string;
+          observed_value: string | number;
+          unit?: string;
+          reference_range?: string;
+          is_abnormal?: boolean | null;
+        }>;
+        interpretation_notes?: string | null;
+        // Scan / Discharge Summary Schema
+        admission_date?: string | null;
+        discharge_date?: string | null;
+        primary_diagnosis?: string | null;
+        chief_complaints?: string[];
+        procedures_performed?: string[];
+        hospital_course_summary?: string;
+        discharge_medications?: string[];
+        follow_up_instructions?: string | null;
+        // Fallback fields
         structuredFields?: {
           possibleMedicines?: string[];
           possibleLabs?: string[];
@@ -100,6 +135,7 @@ export function DocumentPipelinePanel({
       return null;
     }
   }
+
 
   function extractCleanPoints(text: string): string[] {
     if (!text) return [];
@@ -332,8 +368,142 @@ export function DocumentPipelinePanel({
                     </div>
                   </div>
 
-                  {/* Medicines / Lab Quick Badges */}
-                  {(candidateMeds.length > 0 || candidateLabs.length > 0) && (
+                  {/* AI Structured Data View (Prescription Schema) */}
+                  {meta?.medications && meta.medications.length > 0 && (
+                    <div className="rounded-2xl bg-emerald-50/70 p-3.5 border border-emerald-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                          💊 Prescribed Medications ({meta.medications.length})
+                        </p>
+                        {meta.doctor_details?.name && (
+                          <span className="text-[10px] text-emerald-700 font-medium">
+                            Dr. {meta.doctor_details.name} {meta.doctor_details.specialty ? `(${meta.doctor_details.specialty})` : ""}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="divide-y divide-emerald-100/80 rounded-xl bg-white border border-emerald-100 overflow-hidden">
+                        {meta.medications.map((med, i) => (
+                          <div key={i} className="p-2.5 text-xs text-slate-800 space-y-0.5">
+                            <div className="flex items-center justify-between font-bold text-slate-900">
+                              <span>{med.drug_name}</span>
+                              {med.dosage && (
+                                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800 font-mono">
+                                  {med.dosage}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                              {med.frequency && <span>⏰ {med.frequency}</span>}
+                              {med.duration && <span>🗓️ {med.duration}</span>}
+                              {med.instructions && <span className="text-emerald-700 font-medium">ℹ️ {med.instructions}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {meta.diagnoses && meta.diagnoses.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase font-mono">Diagnoses:</span>
+                          {meta.diagnoses.map((d, i) => (
+                            <span key={i} className="rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-emerald-100">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {meta.follow_up_advice && (
+                        <p className="text-[11px] text-emerald-900 bg-white/80 p-2 rounded-lg border border-emerald-100">
+                          📌 <strong>Follow-up:</strong> {meta.follow_up_advice}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI Structured Data View (Lab Sheet Schema) */}
+                  {meta?.test_results && meta.test_results.length > 0 && (
+                    <div className="rounded-2xl bg-indigo-50/70 p-3.5 border border-indigo-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                          🔬 Lab Test Results ({meta.test_results.length})
+                        </p>
+                        {meta.lab_name && (
+                          <span className="text-[10px] text-indigo-700 font-medium">{meta.lab_name}</span>
+                        )}
+                      </div>
+
+                      <div className="divide-y divide-indigo-100/80 rounded-xl bg-white border border-indigo-100 overflow-hidden">
+                        {meta.test_results.map((tr, i) => (
+                          <div key={i} className="p-2.5 text-xs flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-bold text-slate-900">{tr.biomarker_name}</p>
+                              {tr.reference_range && (
+                                <p className="text-[10px] text-slate-400 font-mono">Ref: {tr.reference_range}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="flex items-center gap-1.5 justify-end">
+                                <span className="font-mono font-bold text-slate-800">
+                                  {tr.observed_value} {tr.unit || ""}
+                                </span>
+                                {tr.is_abnormal && (
+                                  <span className="rounded bg-rose-100 text-rose-800 px-1.5 py-0.5 text-[9px] font-bold uppercase font-mono">
+                                    Abnormal
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {meta.interpretation_notes && (
+                        <p className="text-[11px] text-indigo-900 bg-white/80 p-2 rounded-lg border border-indigo-100">
+                          📝 <strong>Interpretation:</strong> {meta.interpretation_notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI Structured Data View (Discharge Summary Schema) */}
+                  {meta?.hospital_course_summary && (
+                    <div className="rounded-2xl bg-amber-50/70 p-3.5 border border-amber-100 space-y-2.5">
+                      <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                        🏥 Hospital Course & Discharge Summary
+                      </p>
+                      <div className="rounded-xl bg-white p-3 border border-amber-100 text-xs text-slate-700 leading-relaxed">
+                        {meta.hospital_course_summary}
+                      </div>
+                      {meta.primary_diagnosis && (
+                        <p className="text-xs text-amber-950 font-medium">
+                          <strong>Primary Diagnosis:</strong> {meta.primary_diagnosis}
+                        </p>
+                      )}
+                      {meta.discharge_medications && meta.discharge_medications.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider font-mono text-amber-800">
+                            Discharge Medications:
+                          </p>
+                          <ul className="mt-1 space-y-1">
+                            {meta.discharge_medications.map((dm, i) => (
+                              <li key={i} className="text-xs text-slate-800 flex items-center gap-1.5">
+                                <span className="text-amber-600 font-bold">•</span> {dm}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {meta.follow_up_instructions && (
+                        <p className="text-[11px] text-amber-900 bg-white/80 p-2 rounded-lg border border-amber-100">
+                          📌 <strong>Instructions:</strong> {meta.follow_up_instructions}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback Medicines / Lab Quick Badges (when structured schema not available) */}
+                  {!meta?.medications && !meta?.test_results && (candidateMeds.length > 0 || candidateLabs.length > 0) && (
                     <div className="rounded-2xl bg-slate-50 p-3 border border-slate-100 space-y-2">
                       {candidateMeds.length > 0 && (
                         <div>
@@ -387,6 +557,7 @@ export function DocumentPipelinePanel({
                 </div>
               );
             }
+
 
             // PRACTITIONER DASHBOARD CLINICAL VIEW (Matches exact screenshot design)
             return (
