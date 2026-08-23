@@ -130,6 +130,17 @@ export function DocumentPipelinePanel({
           possibleMedicines?: string[];
           possibleLabs?: string[];
         };
+        clinical?: {
+          valid_medical_document?: boolean;
+          error_message?: string;
+          patient_name?: string | null;
+          doctor_name?: string | null;
+          prescribed_medicines?: Array<{ name: string; dosage?: string; frequency?: string }>;
+          ayush_formulations?: Array<{ name: string; composition?: string; timing?: string }>;
+          needs_human_review?: boolean;
+        };
+        valid_medical_document?: boolean;
+        error_message?: string;
       };
     } catch {
       return null;
@@ -310,6 +321,10 @@ export function DocumentPipelinePanel({
 
             const candidateMeds = meta?.structuredFields?.possibleMedicines ?? [];
             const candidateLabs = meta?.structuredFields?.possibleLabs ?? [];
+            const clinical = meta?.clinical;
+            const rejectedDoc =
+              clinical?.valid_medical_document === false || meta?.valid_medical_document === false;
+            const rejectNote = clinical?.error_message || meta?.error_message;
             const points = extractCleanPoints(ex.rawText);
 
             // PATIENT CHATBOT FRIENDLY VIEW
@@ -501,6 +516,37 @@ export function DocumentPipelinePanel({
                       )}
                     </div>
                   )}
+
+                  {rejectedDoc && (
+                    <div className="rounded-2xl bg-rose-50 p-3.5 border border-rose-200 text-xs text-rose-900">
+                      <p className="font-bold">Not a clinical document</p>
+                      <p className="mt-1">{rejectNote || "This upload was rejected as non-medical."}</p>
+                    </div>
+                  )}
+
+                  {clinical?.valid_medical_document && (clinical.prescribed_medicines?.length || clinical.ayush_formulations?.length) ? (
+                    <div className="rounded-2xl bg-emerald-50/80 p-3.5 border border-emerald-100 space-y-2">
+                      <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                        Structured clinical extract
+                      </p>
+                      {clinical.patient_name && (
+                        <p className="text-xs text-emerald-950">Patient: {clinical.patient_name}</p>
+                      )}
+                      {clinical.doctor_name && (
+                        <p className="text-xs text-emerald-950">Doctor: {clinical.doctor_name}</p>
+                      )}
+                      {clinical.prescribed_medicines?.map((m, i) => (
+                        <p key={`med-${i}`} className="text-xs text-slate-800">
+                          • {m.name} {m.dosage} {m.frequency}
+                        </p>
+                      ))}
+                      {clinical.ayush_formulations?.map((f, i) => (
+                        <p key={`ayush-${i}`} className="text-xs text-slate-800">
+                          • {f.name} {f.composition} {f.timing}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {/* Fallback Medicines / Lab Quick Badges (when structured schema not available) */}
                   {!meta?.medications && !meta?.test_results && (candidateMeds.length > 0 || candidateLabs.length > 0) && (
