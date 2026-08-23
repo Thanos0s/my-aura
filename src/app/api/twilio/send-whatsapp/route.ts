@@ -14,8 +14,14 @@ export async function POST(request: Request) {
     const { to, patientName, practitionerName, scheduledAt, status, notes } = body;
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const apiKeySid = process.env.TWILIO_API_KEY_SID || (accountSid?.startsWith("SK") ? accountSid : undefined);
+    const authTokenOrSecret = process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_AUTH_TOKEN;
     const fromWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886";
+
+    // Target Account SID for API URL (if accountSid is an SK key, fallback to parent or apiKeySid)
+    const effectiveAccountSid = accountSid?.startsWith("AC")
+      ? accountSid
+      : process.env.TWILIO_MAIN_ACCOUNT_SID || accountSid;
 
     // Clean destination phone number
     const rawPhone = to || process.env.PATIENT_WHATSAPP_NUMBER || "";
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
 
     const messageText = `🏥 *My-Aura Health Clinic* 🏥\n\nHello *${patientName || "Patient"}*,\nYour appointment request has been confirmed:\n\n📅 *Date & Time*: ${formattedDate}\n👨‍⚕️ *Practitioner*: ${practitionerName || "Assigned Doctor"}\n📌 *Status*: ${(status || "Requested").toUpperCase()}\n💬 *Notes*: ${notes || "Follow-up consultation"}\n\n_Thank you for choosing My-Aura. Reply to this chat anytime to reschedule or view your plan!_`;
 
-    if (!accountSid || !authToken) {
+    if (!authTokenOrSecret || (!accountSid && !apiKeySid)) {
       console.log("[Twilio Mock] WhatsApp message dispatched:", {
         to: targetWhatsApp,
         body: messageText,
@@ -51,23 +57,27 @@ export async function POST(request: Request) {
       });
     }
 
-    const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`;
+    // Basic Auth username: use API Key SID if available, otherwise Account SID
+    const authUsername = apiKeySid || accountSid || "";
+    const authHeader = `Basic ${Buffer.from(`${authUsername}:${authTokenOrSecret}`).toString("base64")}`;
     const params = new URLSearchParams();
     params.set("From", fromWhatsApp);
     params.set("To", targetWhatsApp);
     params.set("Body", messageText);
 
-    const twilioRes = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-      }
-    );
+    const twilioEndpoint = effectiveAccountSid?.startsWith("AC")
+      ? `https://api.twilio.com/2010-04-01/Accounts/${effectiveAccountSid}/Messages.json`
+      : `https://api.twilio.com/2010-04-01/Accounts/${authUsername}/Messages.json`;
+
+    const twilioRes = await fetch(twilioEndpoint, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+
 
     const twilioData = (await twilioRes.json()) as { sid?: string; status?: string; message?: string };
     if (!twilioRes.ok) {
