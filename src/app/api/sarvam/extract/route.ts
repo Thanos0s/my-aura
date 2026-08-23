@@ -39,13 +39,14 @@ export async function POST(request: Request) {
     });
   }
 
-  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content ?? "{}";
   let extracted: Record<string, string> = {};
   try {
-    extracted = JSON.parse(content) as Record<string, string>;
+    const clean = content.replace(/```json\s*|```/g, "").trim();
+    extracted = JSON.parse(clean) as Record<string, string>;
   } catch {
     extracted = heuristicExtract(transcript) as Record<string, string>;
   }
   return NextResponse.json({ source: "sarvam", extracted });
+
 }

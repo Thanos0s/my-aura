@@ -31,20 +31,32 @@ export async function POST(request: Request) {
     audio instanceof File && audio.name
       ? audio.name
       : `speech.${audio.type.includes("wav") ? "wav" : audio.type.includes("mp4") ? "mp4" : "webm"}`;
-  outbound.set("file", audio, filename);
-  outbound.set("model", "saaras:v4");
+  const model = process.env.SARVAM_STT_MODEL || "saaras:v3";
+  outbound.set("model", model);
   outbound.set("mode", "codemix");
   if (languageCode) {
     outbound.set("language_code", languageCode);
   }
 
-  const response = await fetch("https://api.sarvam.ai/speech-to-text", {
+  let response = await fetch("https://api.sarvam.ai/speech-to-text", {
     method: "POST",
     headers: {
       "api-subscription-key": apiKey,
     },
     body: outbound,
   });
+
+  if (!response.ok && model !== "saaras:v2") {
+    // Retry with saaras:v2 in case v3 is not enabled on this subscription tier
+    outbound.set("model", "saaras:v2");
+    response = await fetch("https://api.sarvam.ai/speech-to-text", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": apiKey,
+      },
+      body: outbound,
+    });
+  }
 
   if (!response.ok) {
     const err = await response.text();
@@ -59,6 +71,7 @@ export async function POST(request: Request) {
       { status: 502 }
     );
   }
+
 
   const data = (await response.json()) as {
     transcript?: string;
