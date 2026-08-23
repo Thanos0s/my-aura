@@ -46,16 +46,28 @@ export function LandingPage() {
           </p>
 
           <div className="pt-4 flex flex-wrap gap-3">
-            <Link href="/login/patient" className="rounded-full bg-white text-slate-900 px-6 py-3 text-xs font-bold hover:bg-slate-100 shadow-sm transition-all">
+            <Link
+              href="/login/patient"
+              className="rounded-full bg-white hover:bg-slate-100 !text-[#18313c] px-6 py-3 text-xs font-extrabold shadow-md transition-all inline-flex items-center justify-center"
+            >
               Patient Portal
             </Link>
-            <Link href="/login/doctor" className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all">
+            <Link
+              href="/login/doctor"
+              className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md !text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all inline-flex items-center justify-center"
+            >
               Practitioner Login
             </Link>
-            <Link href="/login/admin" className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all">
+            <Link
+              href="/login/admin"
+              className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md !text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all inline-flex items-center justify-center"
+            >
               Admin Login
             </Link>
-            <Link href="/kiosk" className="rounded-full bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 text-xs font-bold shadow-sm transition-all">
+            <Link
+              href="/kiosk"
+              className="rounded-full bg-emerald-500 hover:bg-emerald-600 !text-white px-6 py-3 text-xs font-bold shadow-md transition-all inline-flex items-center justify-center"
+            >
               Walk-up Kiosk 🌿
             </Link>
           </div>
