@@ -465,7 +465,7 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "redFlag") {
     const q = RED_FLAG_QUESTIONS[state.redFlagIndex];
     if (!q) {
-      return nextQuestion({ ...state, phase: "recap" });
+      return nextQuestion({ ...state, phase: "documents" });
     }
     return { kind: "ask", group: "redFlag", id: q.id, text: q.text, yesNo: true, chips: ["Yes", "No"] };
   }
@@ -486,9 +486,10 @@ export function applyYesNo(state: IntakeState, questionId: string, yes: boolean)
     ...state,
     redFlags,
     redFlagIndex: nextIndex,
-    phase: nextIndex >= RED_FLAG_QUESTIONS.length ? "recap" : "redFlag",
+    phase: nextIndex >= RED_FLAG_QUESTIONS.length ? "documents" : "redFlag",
   };
 }
+
 
 function fillSlot(source: AnswerSource, value: string, confidence: number): Slot {
   return {
@@ -618,6 +619,9 @@ export function plainLanguageRecap(state: IntakeState): string {
   const cc = state.socrates.chiefComplaint.value || "not stated";
   const site = state.socrates.site.value;
   const onset = state.socrates.onset.value;
+  const character = state.socrates.character.value;
+  const radiation = state.socrates.radiation.value;
+  const severity = state.socrates.severity.value;
   const meds = state.history.currentMedicines.value || "not stated";
   const allergy = state.history.allergies.value || "not stated";
   const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
@@ -626,5 +630,17 @@ export function plainLanguageRecap(state: IntakeState): string {
   const sleep = ahara.sleep.value || "not stated";
   const water = ahara.waterIntake.value || "not stated";
   const tea = ahara.teaCoffeeSubstances.value || "not stated";
-  return `Main problem: ${cc}. ${site ? `Location: ${site}. ` : ""}${onset ? `Started: ${onset}. ` : ""}Medicines: ${meds}. Allergies: ${allergy}. Diet & lifestyle: meals ${meals}; diet ${diet}; sleep ${sleep}; water ${water}; tea/coffee/substances ${tea}. Answered by: ${state.answeredBy}.`;
+
+  let ayushSummary = "";
+  if (state.pathway === "ayush") {
+    const dash = normalizeDashavidha(state.dashavidha);
+    const prakriti = dash.prakriti.value || "not stated";
+    const vikriti = dash.vikriti.value || "not stated";
+    const agni = dash.agni.value || "not stated";
+    const satva = dash.satva.value || "not stated";
+    ayushSummary = ` · Ayurveda Assessment (Dashavidha): Prakriti (${prakriti}), Vikriti (${vikriti}), Agni (${agni}), Satva (${satva})`;
+  }
+
+  return `Chief Complaint: ${cc}.${site ? ` Location: ${site}.` : ""}${onset ? ` Onset: ${onset}.` : ""}${character ? ` Character: ${character}.` : ""}${radiation ? ` Radiation: ${radiation}.` : ""}${severity ? ` Severity: ${severity}/10.` : ""} Current Medicines: ${meds}. Allergies: ${allergy}. Ahara-Vihara (Lifestyle): Meals: ${meals}; Diet: ${diet}; Sleep: ${sleep}; Water: ${water}; Substances: ${tea}.${ayushSummary} [ABHA Linked | Encounter Verified]`;
 }
+
