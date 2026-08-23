@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { useAuraSession } from "@/components/useAuraSession";
+import { HOME_FOR } from "@/lib/auth/siteFlow";
 import {
   CASE_SPINE,
   DASHAVIDHA_FACTORS,
@@ -25,6 +27,8 @@ function Rail({ steps }: { steps: readonly string[] }) {
 }
 
 export function LandingPage() {
+  const session = useAuraSession();
+
   return (
     <div className="space-y-12 max-w-6xl mx-auto pb-16">
       {/* Hero Banner */}
@@ -46,12 +50,21 @@ export function LandingPage() {
           </p>
 
           <div className="pt-4 flex flex-wrap gap-3">
-            <Link
-              href="/login/patient"
-              className="rounded-full bg-white hover:bg-slate-100 !text-[#18313c] px-6 py-3 text-xs font-extrabold shadow-md transition-all inline-flex items-center justify-center"
-            >
-              Patient Portal
-            </Link>
+            {session?.role ? (
+              <Link
+                href={HOME_FOR[session.role] ?? "/patient"}
+                className="rounded-full bg-white hover:bg-slate-100 !text-[#18313c] px-6 py-3 text-xs font-extrabold shadow-md transition-all inline-flex items-center justify-center gap-1.5"
+              >
+                <span>🌿</span> Go to My {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
+              </Link>
+            ) : (
+              <Link
+                href="/login/patient"
+                className="rounded-full bg-white hover:bg-slate-100 !text-[#18313c] px-6 py-3 text-xs font-extrabold shadow-md transition-all inline-flex items-center justify-center"
+              >
+                Patient Portal
+              </Link>
+            )}
             <Link
               href="/login/doctor"
               className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md !text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all inline-flex items-center justify-center"
@@ -77,6 +90,7 @@ export function LandingPage() {
           </p>
         </div>
       </section>
+
 
       {/* How it Works Grid */}
       <section id="how-it-works" className="space-y-6">

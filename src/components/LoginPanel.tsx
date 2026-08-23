@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useConvexAuth, useMutation } from "convex/react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -8,6 +9,7 @@ import { api } from "../../convex/_generated/api";
 import { convexConfigured } from "@/app/providers";
 import { DEMO_USERS, type Role } from "@/lib/auth/access";
 import { clearSession, writeSession } from "@/lib/auth/session";
+import { useAuraSession } from "@/components/useAuraSession";
 import {
   HOME_FOR,
   roleAllowedAtStation,
@@ -17,6 +19,7 @@ import {
   firebaseAuthMessage,
   getFirebaseAuth,
   isFirebaseConfigured,
+  signOutFirebase,
 } from "@/lib/firebase/client";
 
 const STATION_COPY: Record<LoginStation, { title: string; hint: string }> = {
@@ -69,6 +72,7 @@ export function LoginPanel({
   staffSignupRole?: "practitioner" | "dietitian" | "choose";
 }) {
   const router = useRouter();
+  const session = useAuraSession();
   const { isAuthenticated: convexAuthed } = useConvexAuth();
   const login = useMutation(api.auth.login);
   const register = useMutation(api.auth.register);
@@ -89,6 +93,20 @@ export function LoginPanel({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [usePin, setUsePin] = useState(!firebaseOn);
+
+  // If already logged in, automatically redirect to dashboard
+  useEffect(() => {
+    if (session?.userId && session?.role) {
+      const dest = HOME_FOR[session.role];
+      const timer = setTimeout(() => {
+        router.replace(dest);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [session, router]);
+
+
 
   if (!convexConfigured()) {
     return <p className="text-mist">Connect Convex to enable login.</p>;
@@ -219,6 +237,43 @@ export function LoginPanel({
 
   const showRegister = canRegister && mode === "register";
   const firebaseMode = firebaseOn && !usePin;
+
+  if (session?.userId && session?.role) {
+    const dest = HOME_FOR[session.role];
+    return (
+      <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm">
+          <span className="text-2xl">🌿</span>
+        </div>
+        <div>
+          <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Authenticated Session</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">Already Logged In</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            You are signed in as <strong className="text-slate-800">{session.displayName}</strong> ({session.role}).
+          </p>
+          <p className="font-mono text-[11px] text-sky-700 mt-1">
+            Taking you to your dashboard…
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col gap-2">
+          <Link href={dest} className="btn-pulse py-2.5 text-xs font-bold w-full text-center">
+            Go to {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
+          </Link>
+          <button
+            type="button"
+            className="btn-ghost py-2 text-xs font-semibold w-full"
+            onClick={() => {
+              void signOutFirebase();
+              clearSession();
+              router.refresh();
+            }}
+          >
+            Sign out & switch account
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form

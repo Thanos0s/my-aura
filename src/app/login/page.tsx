@@ -1,4 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuraSession } from "@/components/useAuraSession";
+import { HOME_FOR } from "@/lib/auth/siteFlow";
+import { clearSession } from "@/lib/auth/session";
+import { signOutFirebase } from "@/lib/firebase/client";
 
 const GATES = [
   {
@@ -28,23 +36,78 @@ const GATES = [
 ] as const;
 
 export default function LoginHubPage() {
+  const router = useRouter();
+  const session = useAuraSession();
+
+  useEffect(() => {
+    if (session?.userId && session?.role) {
+      const dest = HOME_FOR[session.role];
+      const timer = setTimeout(() => {
+        router.replace(dest);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [session, router]);
+
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12 md:px-8">
-      <p className="tl-overline">Station gate</p>
-      <h1 className="mt-2 text-4xl">Choose how you enter</h1>
-      <p className="mt-3 max-w-xl text-mist">
-        Patient and practitioner use Firebase Auth. Admin uses PIN. Dietitian can use clinic staff login.
-      </p>
-      <div className="mt-8 grid gap-3">
+    <main className="mx-auto max-w-3xl px-4 py-12 md:px-8 space-y-6">
+      {session?.userId && session?.role && (
+        <div className="rounded-3xl bg-white p-6 md:p-8 shadow-md border border-slate-100/90 text-center space-y-3">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white">
+            <span className="text-xl">🌿</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Already Logged In</h2>
+          <p className="text-xs text-slate-500">
+            Active session: <strong className="text-slate-800">{session.displayName}</strong> ({session.role}).
+          </p>
+          <div className="pt-2 flex flex-wrap justify-center gap-3">
+            <Link href={HOME_FOR[session.role]} className="btn-pulse px-6 py-2.5 text-xs font-bold">
+              Go to Dashboard →
+            </Link>
+            <button
+              type="button"
+              className="btn-ghost px-5 py-2.5 text-xs font-semibold"
+              onClick={() => {
+                void signOutFirebase();
+                clearSession();
+                router.refresh();
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Security Gate</p>
+        <h1 className="mt-1 text-3xl font-bold text-slate-900">Choose How You Enter</h1>
+        <p className="mt-1.5 max-w-xl text-xs text-slate-500">
+          Patient and practitioner use Firebase Auth. Admin uses PIN. Dietitian can use clinic staff login.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         {GATES.map((gate) => (
-          <Link key={gate.href} href={gate.href} className="tl-card block p-5 transition-colors hover:border-pulse">
-            <p className="tl-overline">{gate.overline}</p>
-            <p className="mt-1 text-2xl text-display">{gate.title}</p>
-            <p className="mt-2 text-mist">{gate.copy}</p>
-            <span className="btn-ghost mt-4 px-4 py-2 text-sm">Continue</span>
+          <Link
+            key={gate.href}
+            href={gate.href}
+            className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 block hover:border-sky-300 hover:shadow-md transition-all group"
+          >
+            <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 uppercase">
+              {gate.overline}
+            </span>
+            <p className="mt-2 text-xl font-bold text-slate-900 group-hover:text-sky-950 transition-colors">{gate.title}</p>
+            <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">{gate.copy}</p>
+            <span className="btn-pulse mt-4 px-4 py-1.5 text-xs font-semibold inline-block">
+              Continue →
+            </span>
           </Link>
         ))}
       </div>
     </main>
   );
 }
+
