@@ -46,8 +46,9 @@ export async function POST(request: Request) {
     let confidence = 0;
     let engine: "sarvam" | "tesseract" = "tesseract";
 
-    const sarvamApiKey = process.env.SARVAM_API_KEY;
+    const sarvamApiKey = process.env.SARVAM_OCR_API_KEY || process.env.SARVAM_API_KEY;
     if (sarvamApiKey) {
+
       const sarvamResult = await extractWithSarvam(file, sarvamApiKey);
       if (sarvamResult && sarvamResult.text) {
         text = sarvamResult.text;
