@@ -225,85 +225,111 @@ function PractitionerApp() {
 
   return (
     <div
-      className={`grid min-h-[calc(100vh-3.5rem)] grid-cols-1 ${
+      className={`grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-6 ${
         viewMode === "split"
-          ? "lg:grid-cols-[220px_1fr_380px] 2xl:grid-cols-[250px_1fr_420px]"
-          : "lg:grid-cols-[240px_1fr]"
+          ? "lg:grid-cols-[240px_1fr_380px] 2xl:grid-cols-[260px_1fr_420px]"
+          : "lg:grid-cols-[260px_1fr]"
       }`}
     >
-      <aside className="border-b border-graphite p-4 lg:border-r lg:border-b-0">
-        <p className="tl-overline">Clinic</p>
-        <h1 className="mt-1 text-xl">Practitioner</h1>
-        <p className="mt-1 font-mono text-[11px] text-ash">Final authority. Never auto-diagnostic.</p>
-        <p className="tl-overline mt-4">Patients</p>
-        <ul className="mt-2 space-y-1">
-          {patients?.map((p) => (
-            <li key={p.patientId}>
-              <button
-                className={`w-full rounded-[4px] border border-graphite p-2 text-left text-sm ${
-                  patientFilter === p.patientId ? "nav-active" : ""
-                }`}
-                onClick={() => setPatientFilter(p.patientId)}
-              >
-                {p.displayName}
-                <span className="block font-mono text-[10px] text-ash">{p.lastStatus}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="tl-overline mt-4">Queue</p>
-        <ul className="mt-2 space-y-2">
-          {queue?.map((v) => (
-            <li key={v._id}>
-              <button
-                className={`w-full rounded-[4px] border p-3 text-left ${
-                  v.status === "escalated" ? "border-pulse bg-onyx text-display" : "border-graphite"
-                } ${selected === v._id ? "nav-active pl-4" : ""}`}
-                onClick={() => {
-                  setSelected(v._id);
-                  setPatientFilter(v.patientId);
-                }}
-              >
-                <span className="block font-mono text-[10px] uppercase text-mist">{v.status}</span>
-                <span className="text-sm">
-                  {v.pathway} · {v.languageCode}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* Left Column: Clinic & Patient Queue */}
+      <aside className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90 h-fit space-y-4">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold">OPD Desk</p>
+          <h1 className="text-xl font-bold text-slate-900">Practitioner Console</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Final authority. Never auto-diagnostic.</p>
+        </div>
+
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Patients</p>
+          <ul className="space-y-1.5">
+            {patients?.map((p) => (
+              <li key={p.patientId}>
+                <button
+                  className={`w-full rounded-2xl border p-2.5 text-left text-xs font-semibold transition-all ${
+                    patientFilter === p.patientId
+                      ? "bg-[#1b343f] text-white shadow-xs border-[#1b343f]"
+                      : "border-slate-100 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  }`}
+                  onClick={() => setPatientFilter(p.patientId)}
+                >
+                  {p.displayName}
+                  <span className={`block font-mono text-[10px] font-normal mt-0.5 ${patientFilter === p.patientId ? "text-slate-300" : "text-slate-400"}`}>
+                    {p.lastStatus}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Queue</p>
+          <ul className="space-y-2">
+            {queue?.map((v) => (
+              <li key={v._id}>
+                <button
+                  className={`w-full rounded-2xl border p-3 text-left transition-all ${
+                    v.status === "escalated"
+                      ? "border-rose-300 bg-rose-50 text-rose-900 shadow-xs"
+                      : selected === v._id
+                        ? "bg-[#1b343f] text-white shadow-xs border-[#1b343f]"
+                        : "border-slate-100 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  }`}
+                  onClick={() => {
+                    setSelected(v._id);
+                    setPatientFilter(v.patientId);
+                  }}
+                >
+                  <span className={`block font-mono text-[10px] uppercase font-bold ${
+                    selected === v._id ? "text-slate-300" : "text-slate-500"
+                  }`}>
+                    {v.status}
+                  </span>
+                  <span className="text-xs font-semibold">
+                    {v.pathway} · {v.languageCode}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </aside>
-      <main className="space-y-6 p-4 md:p-6 min-w-0">
+
+      {/* Center Column: Clinical Consultation Desk */}
+      <main className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
         {!detail ? (
-          <p className="text-mist">Select a visit from the queue.</p>
+          <div className="text-center py-16 text-slate-400">
+            <span className="text-3xl">🩺</span>
+            <p className="mt-2 text-sm">Select a patient visit from the queue to start consultation.</p>
+          </div>
         ) : viewMode === "pipeline" ? (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-graphite pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="tl-overline">Case Documents</p>
-                <h2 className="mt-1 text-2xl font-bold">{detail.patientName}</h2>
-                <p className="mt-0.5 text-xs text-mist">
+                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Case Documents</p>
+                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">{detail.patientName}</h2>
+                <p className="text-xs text-slate-500">
                   {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway} · {detail.visit.languageCode}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 rounded border border-graphite bg-onyx p-1">
+              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   type="button"
-                  className="px-3 py-1 text-xs font-medium rounded text-mist hover:text-display"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={() => setViewMode("split")}
                 >
                   🔲 3-Column Split
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1 text-xs font-medium rounded text-mist hover:text-display"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={() => setViewMode("desk")}
                 >
                   📋 Consultation Desk
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1 text-xs font-medium rounded bg-pulse text-onyx font-semibold"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold bg-[#1b343f] text-white shadow-xs"
                   onClick={() => setViewMode("pipeline")}
                 >
                   📄 Document Pipeline & OCR ({detail.extracts.length})
@@ -321,37 +347,39 @@ function PractitionerApp() {
         ) : (
           <>
             {detail.flags.some((f) => f.escalationStatus === "open") ? (
-              <div className="tl-card border-pulse bg-onyx p-4">
-                <p className="tl-overline text-pulse">Red flag</p>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-xs">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700">⚠️ Red Flag Alert</p>
                 {detail.flags.map((f) => (
-                  <p key={f._id} className="mt-2 font-mono text-sm">
-                    {f.questionId}{" "}
+                  <p key={f._id} className="mt-2 font-mono text-xs text-rose-950 flex items-center justify-between">
+                    <span>{f.questionId}</span>
                     <button
-                      className="btn-pulse ml-2 px-3 py-1 text-xs"
+                      className="rounded-full bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 text-xs font-bold transition-colors"
                       onClick={() => void acknowledgeRedFlag({ eventId: f._id })}
                     >
-                      acknowledge
+                      Acknowledge
                     </button>
                   </p>
                 ))}
               </div>
             ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-graphite pb-4">
+
+            {/* Case Header & View Switcher */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="tl-overline">Case</p>
-                <h2 className="mt-1 text-2xl font-bold">{detail.patientName}</h2>
-                <p className="mt-0.5 text-xs text-mist">
+                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Clinical Case</p>
+                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">{detail.patientName}</h2>
+                <p className="text-xs text-slate-500">
                   {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway}
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded border border-graphite bg-onyx p-1">
+              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   type="button"
-                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     viewMode === "split"
-                      ? "bg-pulse text-onyx font-semibold"
-                      : "text-mist hover:text-display"
+                      ? "bg-[#1b343f] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                   onClick={() => setViewMode("split")}
                 >
@@ -359,10 +387,10 @@ function PractitionerApp() {
                 </button>
                 <button
                   type="button"
-                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     viewMode === "desk"
-                      ? "bg-pulse text-onyx font-semibold"
-                      : "text-mist hover:text-display"
+                      ? "bg-[#1b343f] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                   onClick={() => setViewMode("desk")}
                 >
@@ -370,48 +398,46 @@ function PractitionerApp() {
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-xs font-medium rounded text-mist hover:text-display transition-colors"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={() => setViewMode("pipeline")}
                 >
                   📄 Document Pipeline & OCR ({detail.extracts.length})
                 </button>
-
               </div>
             </div>
 
             {viewMode === "desk" && (
-              <div className="flex items-center justify-between rounded border border-graphite bg-onyx/70 p-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">📄</span>
+              <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">📄</span>
                   <div>
-                    <p className="text-xs font-semibold text-display">
+                    <p className="text-xs font-bold text-sky-950">
                       Document Pipeline: {detail.extracts.length} attached {ocrBlocked ? "· review pending" : ""}
                     </p>
-                    <p className="text-[11px] text-mist">
-                      Physical documents are reviewed in the dedicated OCR station without auto-merging into meds/allergies.
+                    <p className="text-[11px] text-sky-700">
+                      Physical documents are reviewed in the dedicated OCR station without auto-merging into active medications.
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="btn-ghost px-3 py-1 text-xs"
+                  className="btn-ghost px-4 py-1.5 text-xs font-semibold"
                   onClick={() => setViewMode("pipeline")}
                 >
                   Open Document Station →
                 </button>
               </div>
             )}
-            {notice ? <p className="tl-surface p-3 font-mono text-sm text-warning">{notice}</p> : null}
 
+            {notice ? <p className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-mono text-amber-900">{notice}</p> : null}
 
-
-            <section>
-              <p className="tl-overline">History</p>
-              <h3 className="text-xl">Previous consultations</h3>
-              <ul className="mt-2 font-mono text-sm">
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="font-mono text-[10px] uppercase font-bold text-slate-400">History</p>
+              <h3 className="text-base font-bold text-slate-900 mt-1">Previous Consultations</h3>
+              <ul className="mt-2 font-mono text-xs space-y-1">
                 {history?.map((v) => (
                   <li key={v._id}>
-                    <button className="text-pulse" onClick={() => setSelected(v._id)}>
+                    <button className="text-sky-700 hover:underline font-semibold" onClick={() => setSelected(v._id)}>
                       {new Date(v.createdAt).toLocaleString()} · {v.status}
                     </button>
                   </li>
@@ -419,51 +445,54 @@ function PractitionerApp() {
               </ul>
             </section>
 
-            <section>
-              <h3 className="text-xl">Symptom timeline</h3>
-              {symptoms?.map((s) => (
-                <p key={s._id} className="font-mono text-sm text-mist">
-                  {new Date(s.createdAt).toLocaleString()} · {s.severity}/10 · {s.text}
-                </p>
-              ))}
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Symptom Timeline</h3>
+              <div className="mt-2 space-y-1">
+                {symptoms?.map((s) => (
+                  <p key={s._id} className="font-mono text-xs text-slate-700">
+                    {new Date(s.createdAt).toLocaleString()} · Severity {s.severity}/10 · {s.text}
+                  </p>
+                ))}
+              </div>
             </section>
 
             {intake ? <StructuredRecord intake={intake} onCorrect={correct} /> : null}
 
             {intake ? (
-              <section className="border-t border-graphite pt-4">
-                <p className="tl-overline">Validation</p>
+              <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Validation</p>
                 {canCompleteIntake({ ...intake, patientRecapConfirmed: true }).reasons.map((r) => (
-                  <p key={r} className="font-mono text-sm text-warning">{r}</p>
+                  <p key={r} className="font-mono text-xs text-amber-800 font-semibold">{r}</p>
                 ))}
               </section>
             ) : null}
 
-            <section className="border-t border-graphite pt-4">
-              <p className="tl-overline">Dashavidha</p>
-              <h3 className="text-xl">Practitioner interpretation only</h3>
-              <p className="text-sm text-mist">AI slots are not a diagnosis. You write the assessment.</p>
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Dashavidha Pariksha</p>
+              <h3 className="text-base font-bold text-slate-900 mt-1">Practitioner Assessment & Interpretation</h3>
+              <p className="text-xs text-slate-500">AI slots provide intake assistance. Practitioner writes the final clinical assessment.</p>
               <textarea
                 className="tl-input mt-2"
                 rows={3}
                 defaultValue={ayurveda?.interpretation ?? ""}
                 onChange={(e) => setInterpretation(e.target.value)}
+                placeholder="e.g. Vata-Pitta Prakriti with mild Sama Agni, Pravara Bala..."
               />
               <button
-                className="btn-ghost mt-2 px-4 py-1.5 text-sm"
-                onClick={() =>
-                  selected
-                    ? void saveAyurveda({
-                        sessionUserId: actorId,
-                        visitId: selected,
-                        interpretation: interpretation || ayurveda?.interpretation || "",
-                      })
-                    : undefined
-                }
+                className="btn-pulse mt-2 px-4 py-1.5 text-xs font-semibold"
+                onClick={() => {
+                  if (!selected || !sessionUserId) return;
+                  void saveAyurveda({
+                    sessionUserId,
+                    visitId: selected,
+                    interpretation,
+                  }).then(() => setNotice("Ayurveda assessment saved."));
+                }}
               >
-                Save assessment
+                Save Dashavidha Assessment
               </button>
             </section>
+
 
             <section className="border-t border-graphite pt-4">
               <h3 className="text-xl">Practitioner notes</h3>

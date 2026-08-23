@@ -1,35 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #000000;
-  --color-ink: #080808;
-  --color-onyx: #111111;
-  --color-charcoal: #1a1a1a;
-  --color-graphite: #333333;
-  --color-steel: #555555;
-  --color-ash: #888888;
-  --color-mist: #aaaaaa;
-  --color-body: #cccccc;
-  --color-display: #ffffff;
-  --color-pulse: #e4f222;
-  --color-success: #44b66a;
-  --color-warning: #e8a030;
-  --font-sans: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  --color-void: #edf4f8;
+  --color-ink: #ffffff;
+  --color-onyx: #f8fafc;
+  --color-charcoal: #f1f5f9;
+  --color-graphite: #e2e8f0;
+  --color-steel: #94a3b8;
+  --color-ash: #64748b;
+  --color-mist: #475569;
+  --color-body: #1e293b;
+  --color-display: #0f172a;
+  --color-pulse: #1b343f;
+  --color-pulse-accent: #0284c7;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --font-sans: var(--font-display), "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-data), "JetBrains Mono", ui-monospace, monospace;
-  --radius-std: 4px;
+  --radius-std: 1.25rem;
+  --radius-card: 1.75rem;
   --radius-pill: 9999px;
 }
 
 :root {
-  --bg: #000000;
-  --ink: #cccccc;
-  --accent: #e4f222;
+  --bg: #edf4f8;
+  --ink: #1e293b;
+  --accent: #1b343f;
+  --card-bg: #ffffff;
+  --card-shadow: 0 10px 30px -5px rgba(20, 45, 65, 0.04), 0 4px 12px -2px rgba(20, 45, 65, 0.02);
 }
 
 html,
 body {
-  background: var(--color-void);
-  color: var(--color-body);
+  background: radial-gradient(circle at 10% 15%, #e2eff5 0%, #edf5f8 50%, #e3eff5 100%);
+  background-attachment: fixed;
+  color: #334155;
   font-family: var(--font-sans);
   font-size: 14px;
   letter-spacing: -0.01em;
@@ -40,9 +45,9 @@ h1,
 h2,
 h3,
 .tl-display {
-  color: var(--color-display);
-  letter-spacing: -0.04em;
-  font-weight: 500;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  font-weight: 700;
 }
 
 code,
@@ -56,19 +61,20 @@ a {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--color-pulse) 35%, transparent);
-  color: var(--color-display);
+  background: #bde0ef;
+  color: #0f172a;
 }
 
 .tl-card {
-  background: transparent;
-  border: 1px solid var(--color-graphite);
-  border-radius: var(--radius-std);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
 }
 
 .tl-surface {
-  background: var(--color-onyx);
-  border: 1px solid var(--color-graphite);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: var(--radius-std);
 }
 
@@ -78,12 +84,21 @@ a {
   justify-content: center;
   gap: 0.5rem;
   border-radius: var(--radius-pill);
-  background: var(--color-pulse);
-  color: var(--color-void);
-  font-weight: 500;
+  background: #1b343f;
+  color: #ffffff;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  border: 1px solid var(--color-pulse);
+  border: 1px solid #1b343f;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(27, 52, 63, 0.15);
+  transition: all 0.2s ease;
+}
+
+.btn-pulse:hover:not(:disabled) {
+  background: #254452;
+  border-color: #254452;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(27, 52, 63, 0.22);
 }
 
 .btn-pulse:disabled {
@@ -97,72 +112,67 @@ a {
   justify-content: center;
   gap: 0.5rem;
   border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-display);
-  border: 1px solid var(--color-graphite);
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  font-weight: 500;
   letter-spacing: -0.01em;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
 }
 
-.btn-ghost:hover,
-.btn-pulse:hover:not(:disabled) {
-  filter: brightness(1.06);
+.btn-ghost:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
 .tl-input {
   width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--color-graphite);
-  border-radius: 0;
-  color: var(--color-display);
-  padding: 0.65rem 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  color: #0f172a;
+  padding: 0.65rem 1rem;
   outline: none;
   font: inherit;
+  transition: all 0.2s ease;
 }
 
 .tl-input:focus {
-  border-bottom-color: var(--color-pulse);
+  background: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
 }
 
 .tl-overline {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-ash);
+  letter-spacing: 0.08em;
+  color: #64748b;
 }
 
 .tl-tag {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid var(--color-graphite);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
   border-radius: var(--radius-pill);
-  padding: 0.2rem 0.55rem;
-  color: var(--color-mist);
+  padding: 0.25rem 0.65rem;
 }
 
 .nav-active {
   position: relative;
-  color: var(--color-display);
-}
-
-.nav-active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.35rem;
-  bottom: 0.35rem;
-  width: 2px;
-  background: var(--color-pulse);
-}
-
-.hairline {
-  border-color: var(--color-graphite);
+  background: #1b343f !important;
+  color: #ffffff !important;
+  font-weight: 600;
 }
 
 .status-live {
@@ -173,17 +183,17 @@ a {
 
 .status-live::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 9999px;
-  background: var(--color-pulse);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-pulse) 70%, transparent);
+  background: #059669;
+  box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.6);
   animation: status-pulse 1.8s ease-out infinite;
 }
 
 @keyframes status-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-pulse) 55%, transparent);
+    box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.5);
   }
   70% {
     box-shadow: 0 0 0 7px transparent;
@@ -194,5 +204,6 @@ a {
 }
 
 input[type="checkbox"] {
-  accent-color: var(--color-pulse);
+  accent-color: #1b343f;
 }
+

@@ -222,57 +222,70 @@ export function LoginPanel({
 
   return (
     <form
-      className="tl-card max-w-lg space-y-3 p-5"
+      className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         void (firebaseMode ? onFirebaseSubmit() : onPinSubmit());
       }}
     >
-      <p className="tl-overline">Station gate</p>
-      <h2 className="text-xl text-display">{copy.title}</h2>
-      <p className="text-sm text-mist">{copy.hint}</p>
+      <div className="border-b border-slate-100 pb-3">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Security Gate</p>
+        <h2 className="text-2xl font-bold text-slate-900 mt-0.5">{copy.title}</h2>
+        <p className="text-xs text-slate-500 mt-1">{copy.hint}</p>
+      </div>
+
       {firebaseOn ? (
-        <p className="font-mono text-[11px] text-ash">
+        <p className="font-mono text-[11px] text-slate-500">
           {convexAuthed ? "Firebase session linked to Convex." : "Firebase Auth · email / password"}
         </p>
       ) : station !== "admin" ? (
-        <p className="font-mono text-[11px] text-warning">
+        <p className="font-mono text-[11px] text-amber-700 bg-amber-50 p-2 rounded-xl border border-amber-200">
           Firebase env vars missing. Using hashed PIN until NEXT_PUBLIC_FIREBASE_* is set.
         </p>
       ) : null}
+
       {canRegister ? (
-        <div className="flex gap-2">
+        <div className="flex gap-2 bg-slate-100 p-1 rounded-2xl">
           <button
             type="button"
-            className={mode === "login" ? "btn-pulse px-3 py-1 text-sm" : "btn-ghost px-3 py-1 text-sm"}
+            className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+              mode === "login" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+            }`}
             onClick={() => setMode("login")}
           >
             Login
           </button>
           <button
             type="button"
-            className={mode === "register" ? "btn-pulse px-3 py-1 text-sm" : "btn-ghost px-3 py-1 text-sm"}
+            className={`flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+              mode === "register" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+            }`}
             onClick={() => setMode("register")}
           >
             {station === "patient" ? "Register (patient)" : "Register (clinic)"}
           </button>
         </div>
       ) : null}
+
       {firebaseOn ? (
         <div className="flex gap-2">
           <button
             type="button"
-            className={!usePin ? "btn-pulse px-3 py-1 text-sm" : "btn-ghost px-3 py-1 text-sm"}
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+              !usePin ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
             onClick={() => {
               setUsePin(false);
               setSecret("");
             }}
           >
-            Firebase
+            Firebase Auth
           </button>
           <button
             type="button"
-            className={usePin ? "btn-pulse px-3 py-1 text-sm" : "btn-ghost px-3 py-1 text-sm"}
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+              usePin ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
             onClick={() => {
               setUsePin(true);
               setSecret("1234");
@@ -282,20 +295,22 @@ export function LoginPanel({
           </button>
         </div>
       ) : null}
+
       <label className="block">
-        <span className="tl-overline">Email</span>
+        <span className="text-xs font-semibold text-slate-700">Email Address</span>
         <input
-          className="tl-input"
+          className="tl-input mt-1"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="username"
           required
         />
       </label>
+
       <label className="block">
-        <span className="tl-overline">{firebaseMode ? "Password" : "PIN (hashed at rest)"}</span>
+        <span className="text-xs font-semibold text-slate-700">{firebaseMode ? "Password" : "PIN (hashed at rest)"}</span>
         <input
-          className="tl-input"
+          className="tl-input mt-1"
           type={firebaseMode ? "password" : "text"}
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
@@ -303,17 +318,19 @@ export function LoginPanel({
           required
         />
       </label>
+
       {showRegister ? (
         <label className="block">
-          <span className="tl-overline">Display name</span>
-          <input className="tl-input" value={name} onChange={(e) => setName(e.target.value)} />
+          <span className="text-xs font-semibold text-slate-700">Display Name</span>
+          <input className="tl-input mt-1" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
       ) : null}
+
       {showRegister && station === "staff" && staffSignupRole === "choose" ? (
         <label className="block">
-          <span className="tl-overline">Clinic role</span>
+          <span className="text-xs font-semibold text-slate-700">Clinic Role</span>
           <select
-            className="tl-input"
+            className="tl-input mt-1"
             value={staffRole}
             onChange={(e) => setStaffRole(e.target.value as "practitioner" | "dietitian")}
           >
@@ -322,41 +339,55 @@ export function LoginPanel({
           </select>
         </label>
       ) : null}
-      {notice ? <p className="font-mono text-sm text-warning">{notice}</p> : null}
-      <button className="btn-pulse px-5 py-2" type="submit" disabled={busy}>
-        {busy
-          ? "Working…"
-          : showRegister
-            ? station === "patient"
-              ? "Create patient account"
-              : "Create clinic account"
-            : "Enter station"}
-      </button>
-      <button
-        className="btn-ghost px-4 py-2 text-sm"
-        type="button"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            const rows = await withTimeout(seed({}), 12000, "Convex did not respond");
-            setNotice(`Seeded ${rows.length} demo users. PIN 1234. Use Demo PIN if Firebase is not ready.`);
-          } catch (e) {
-            setNotice(e instanceof Error ? e.message : "Seed failed");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        Seed demo users
-      </button>
-      <ul className="font-mono text-[11px] text-ash">
-        {allowed.map((u) => (
-          <li key={u.email}>
-            {u.role} · {u.email} · PIN {u.pin}
-          </li>
-        ))}
-      </ul>
+
+      {notice ? (
+        <p className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-mono text-amber-900">
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="pt-2 flex flex-col gap-2">
+        <button className="btn-pulse py-2.5 text-xs font-bold w-full" type="submit" disabled={busy}>
+          {busy
+            ? "Working…"
+            : showRegister
+              ? station === "patient"
+                ? "Create Patient Account"
+                : "Create Clinic Account"
+              : "Enter Station →"}
+        </button>
+
+        <button
+          className="btn-ghost py-2 text-xs font-semibold w-full"
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const rows = await withTimeout(seed({}), 12000, "Convex did not respond");
+              setNotice(`Seeded ${rows.length} demo users. PIN 1234. Use Demo PIN if Firebase is not ready.`);
+            } catch (e) {
+              setNotice(e instanceof Error ? e.message : "Seed failed");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          🌱 Seed Demo Users (PIN: 1234)
+        </button>
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400 mb-1">Available Demo Accounts</p>
+        <ul className="font-mono text-[11px] text-slate-500 space-y-0.5">
+          {allowed.map((u) => (
+            <li key={u.email}>
+              <span className="font-semibold text-slate-800">{u.role}:</span> {u.email} · PIN {u.pin}
+            </li>
+          ))}
+        </ul>
+      </div>
     </form>
   );
 }
+

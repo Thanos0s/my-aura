@@ -102,27 +102,27 @@ export function DocumentPipelinePanel({
   return (
     <aside className="space-y-4">
       {/* 5-Stage Visual Progress Tracker */}
-      <div className="tl-card p-4">
-        <div className="flex items-center justify-between border-b border-graphite pb-2">
-          <p className="tl-overline">Document Pipeline</p>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-ash">
+      <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-700">Document Pipeline</p>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-500">
             5 Stages
           </span>
         </div>
 
-        <ol className="mt-3 space-y-2">
+        <ol className="mt-3.5 space-y-2">
           {DOC_STAGES.map((step, i) => {
             const isCurrent = i === currentStageIndex;
             const isCompleted = totalAttached > 0 && i < currentStageIndex;
             return (
               <li key={step.id} className="flex items-start gap-2.5">
                 <span
-                  className={`mt-0.5 font-mono text-[11px] font-semibold transition-colors ${
+                  className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                     isCurrent
-                      ? "text-pulse"
+                      ? "bg-[#1b343f] text-white shadow-xs"
                       : isCompleted
-                        ? "text-success"
-                        : "text-ash"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-slate-100 text-slate-400"
                   }`}
                 >
                   {isCompleted ? "✓" : step.num}
@@ -131,10 +131,10 @@ export function DocumentPipelinePanel({
                   <span
                     className={`text-xs font-medium ${
                       isCurrent
-                        ? "text-display font-semibold"
+                        ? "font-bold text-slate-900"
                         : isCompleted
-                          ? "text-display"
-                          : "text-mist"
+                          ? "text-slate-700"
+                          : "text-slate-400"
                     }`}
                   >
                     {step.label}
@@ -146,32 +146,32 @@ export function DocumentPipelinePanel({
         </ol>
 
         {/* Counter Summary */}
-        <div className="mt-3.5 flex items-center justify-between rounded bg-onyx px-2.5 py-1.5 font-mono text-[11px]">
-          <span className="text-mist">Attached: <strong className="text-display">{totalAttached}</strong></span>
-          <span className={reviewPending > 0 ? "text-warning font-semibold" : "text-success"}>
+        <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 p-2.5 font-mono text-[11px] border border-slate-100">
+          <span className="text-slate-500">Attached: <strong className="text-slate-900">{totalAttached}</strong></span>
+          <span className={reviewPending > 0 ? "text-amber-700 font-bold" : "text-emerald-700 font-bold"}>
             Doctor review pending: <strong>{reviewPending}</strong>
           </span>
         </div>
       </div>
 
       {/* Safety Rail Guarantee Callout */}
-      <div className="rounded border border-graphite bg-onyx/70 p-3.5 shadow-sm">
-        <div className="flex items-center gap-2 text-pulse">
-          <span className="text-sm font-bold">🛡️</span>
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-display">
-            Clinical Safety Rail
+      <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🛡️</span>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-sky-900">
+            Clinical Safety Guarantee
           </p>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-mist">
-          OCR output <strong>never silent-merges</strong> into medicines or allergies. All extracted records remain in this auxiliary pipeline until clinician verification.
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+          OCR output <strong>never silent-merges</strong> into active medications or allergies. All extracted records remain auxiliary reference data until clinician verification.
         </p>
       </div>
 
-      {/* Doctor Upload & Scan Station */}
+      {/* Doctor / Patient Upload Station */}
       {onUpload && (
-        <div className="tl-card p-4">
-          <p className="tl-overline">Desk Upload & Scan</p>
-          <p className="mt-1 text-xs text-mist">
+        <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-700">Desk Upload & Scan</p>
+          <p className="mt-1 text-xs text-slate-500">
             Capture or attach physical Rx, lab reports, or discharge summaries.
           </p>
 
@@ -186,10 +186,10 @@ export function DocumentPipelinePanel({
               <button
                 key={id}
                 type="button"
-                className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
+                className={`px-2 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                   selectedKind === id
-                    ? "bg-pulse text-onyx font-semibold"
-                    : "bg-surface text-mist hover:text-display border border-graphite"
+                    ? "bg-[#1b343f] text-white shadow-xs"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80"
                 }`}
                 onClick={() => setSelectedKind(id)}
               >
@@ -201,22 +201,22 @@ export function DocumentPipelinePanel({
           <div className="mt-3">
             <label
               htmlFor={fileInputId}
-              className={`flex cursor-pointer flex-col items-center justify-center rounded border border-dashed p-4 text-center transition-colors ${
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center transition-all ${
                 isProcessing
-                  ? "border-pulse bg-onyx/50 cursor-not-allowed"
-                  : "border-graphite bg-surface hover:border-pulse"
+                  ? "border-sky-400 bg-sky-50/50 cursor-not-allowed"
+                  : "border-slate-200 bg-slate-50 hover:border-sky-400 hover:bg-sky-50/30"
               }`}
             >
               {isProcessing ? (
                 <div className="space-y-1">
-                  <span className="inline-block animate-spin text-pulse text-lg">⚙</span>
-                  <p className="font-mono text-xs text-pulse">Processing OCR…</p>
+                  <span className="inline-block animate-spin text-sky-600 text-lg">⚙</span>
+                  <p className="font-mono text-xs text-sky-700 font-bold">Processing OCR…</p>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <span className="text-base text-mist">📷 / 📁</span>
-                  <p className="text-xs font-medium text-display">Click to upload or snap photo</p>
-                  <p className="font-mono text-[10px] text-ash">Sarvam Document AI / Tesseract fallback</p>
+                  <span className="text-base text-slate-500">📷 / 📁</span>
+                  <p className="text-xs font-bold text-slate-800">Click to upload or snap photo</p>
+                  <p className="font-mono text-[10px] text-slate-400">Sarvam Document AI / Tesseract fallback</p>
                 </div>
               )}
               <input
@@ -232,7 +232,7 @@ export function DocumentPipelinePanel({
           </div>
 
           {statusMessage && (
-            <p className="mt-2 font-mono text-[11px] text-mist">{statusMessage}</p>
+            <p className="mt-2 font-mono text-[11px] text-slate-600 font-medium">{statusMessage}</p>
           )}
         </div>
       )}
@@ -240,12 +240,14 @@ export function DocumentPipelinePanel({
       {/* OCR Extract Cards */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="tl-overline">Attached Document Extracts ({totalAttached})</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Attached Document Extracts ({totalAttached})
+          </p>
         </div>
 
         {extracts.length === 0 ? (
-          <div className="tl-surface rounded p-4 text-center">
-            <p className="text-xs text-mist">No documents attached to this visit yet.</p>
+          <div className="rounded-2xl bg-white p-5 text-center border border-slate-100">
+            <p className="text-xs text-slate-400">No physical documents attached to this visit yet.</p>
           </div>
         ) : (
           extracts.map((ex) => {
@@ -265,17 +267,17 @@ export function DocumentPipelinePanel({
             return (
               <div
                 key={ex._id}
-                className={`tl-card rounded p-3.5 transition-all ${
-                  isBlocked ? "border-pulse bg-onyx/40" : "border-graphite"
+                className={`rounded-3xl bg-white p-4 shadow-sm border transition-all ${
+                  isBlocked ? "border-amber-300 ring-2 ring-amber-100" : "border-slate-100"
                 }`}
               >
                 {/* Card Top: Kind, Confidence, Review Badge */}
-                <div className="flex items-center justify-between gap-2 border-b border-graphite pb-2">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-mist">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
                       {meta?.kind || "Document"}
                     </span>
-                    <span className="font-mono text-[10px] text-ash">
+                    <span className="font-mono text-[10px] text-slate-400">
                       {ex.createdAt
                         ? new Date(ex.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
@@ -283,16 +285,15 @@ export function DocumentPipelinePanel({
                           })
                         : "Attached"}
                     </span>
-
                   </div>
 
                   <span
-                    className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                    className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold ${
                       badge.tier === "high"
-                        ? "bg-success/20 text-success"
+                        ? "bg-emerald-100 text-emerald-800"
                         : badge.tier === "review"
-                          ? "bg-warning/20 text-warning"
-                          : "bg-pulse/20 text-pulse"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
                     }`}
                   >
                     {Math.round(ex.confidence * 100)}% · {badge.label}
@@ -301,16 +302,14 @@ export function DocumentPipelinePanel({
 
                 {/* Status Indicator */}
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="font-mono text-[11px] text-ash">Status:</span>
+                  <span className="font-mono text-[11px] text-slate-500">Status:</span>
                   <span
-                    className={`font-mono text-[11px] uppercase font-semibold ${
+                    className={`font-mono text-[11px] uppercase font-bold ${
                       ex.reviewStatus === "confirmed"
-                        ? "text-success"
+                        ? "text-emerald-700"
                         : ex.reviewStatus === "corrected"
-                          ? "text-pulse"
-                          : ex.reviewStatus === "failed"
-                            ? "text-warning"
-                            : "text-warning"
+                          ? "text-sky-700"
+                          : "text-amber-700"
                     }`}
                   >
                     {ex.reviewStatus}
@@ -319,17 +318,17 @@ export function DocumentPipelinePanel({
 
                 {/* Candidate Hints from OCR */}
                 {(candidateMeds.length > 0 || candidateLabs.length > 0) && (
-                  <div className="mt-2.5 space-y-1.5 rounded bg-surface p-2 text-xs">
+                  <div className="mt-2.5 space-y-1.5 rounded-2xl bg-slate-50 p-2.5 text-xs border border-slate-100">
                     {candidateMeds.length > 0 && (
                       <div>
-                        <span className="font-mono text-[10px] font-semibold text-mist uppercase">
+                        <span className="font-mono text-[10px] font-bold text-slate-600 uppercase">
                           💊 Detected Rx Hints:
                         </span>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {candidateMeds.map((med, idx) => (
                             <span
                               key={idx}
-                              className="rounded bg-onyx px-1.5 py-0.5 font-mono text-[10px] text-display border border-graphite"
+                              className="rounded-lg bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-800 border border-slate-200"
                             >
                               {med}
                             </span>
@@ -339,14 +338,14 @@ export function DocumentPipelinePanel({
                     )}
                     {candidateLabs.length > 0 && (
                       <div className="mt-1.5">
-                        <span className="font-mono text-[10px] font-semibold text-mist uppercase">
+                        <span className="font-mono text-[10px] font-bold text-slate-600 uppercase">
                           🔬 Detected Lab Hints:
                         </span>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {candidateLabs.map((lab, idx) => (
                             <span
                               key={idx}
-                              className="rounded bg-onyx px-1.5 py-0.5 font-mono text-[10px] text-display border border-graphite"
+                              className="rounded-lg bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-800 border border-slate-200"
                             >
                               {lab}
                             </span>
@@ -361,7 +360,7 @@ export function DocumentPipelinePanel({
                 <div className="mt-2.5">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between text-[11px] text-mist hover:text-display"
+                    className="flex w-full items-center justify-between text-[11px] text-slate-500 hover:text-slate-800 font-semibold"
                     onClick={() =>
                       setShowRaw((prev) => ({ ...prev, [ex._id]: !isOpenRaw }))
                     }
@@ -373,7 +372,7 @@ export function DocumentPipelinePanel({
                   </button>
 
                   {isOpenRaw && (
-                    <pre className="mt-1.5 max-h-36 overflow-auto rounded bg-onyx p-2 font-mono text-[11px] text-ash whitespace-pre-wrap">
+                    <pre className="mt-1.5 max-h-36 overflow-auto rounded-xl bg-slate-50 p-2.5 font-mono text-[11px] text-slate-600 whitespace-pre-wrap border border-slate-200">
                       {ex.rawText || "(empty / unreadable)"}
                     </pre>
                   )}
@@ -382,7 +381,7 @@ export function DocumentPipelinePanel({
                 {/* Doctor Correction Textarea */}
                 <div className="mt-2.5">
                   <label className="block">
-                    <span className="font-mono text-[10px] text-mist uppercase">
+                    <span className="font-mono text-[10px] text-slate-500 uppercase font-semibold">
                       Structured Extract / Correction:
                     </span>
                     <textarea
@@ -404,14 +403,14 @@ export function DocumentPipelinePanel({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      className="btn-pulse px-3 py-1 text-xs font-medium"
+                      className="btn-pulse px-3.5 py-1 text-xs font-semibold"
                       onClick={() => void onReview(ex._id, "confirmed")}
                     >
                       ✓ Confirm Extract
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost px-3 py-1 text-xs font-medium"
+                      className="btn-ghost px-3.5 py-1 text-xs font-semibold"
                       onClick={() =>
                         void onReview(ex._id, "corrected", draft)
                       }
@@ -428,3 +427,4 @@ export function DocumentPipelinePanel({
     </aside>
   );
 }
+

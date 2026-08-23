@@ -34,7 +34,6 @@ function AdminApp() {
   const kb = useQuery(api.adminOps.listKnowledge, sessionUserId ? { sessionUserId } : "skip");
   const issues = useQuery(api.adminOps.listIssues, sessionUserId ? { sessionUserId } : "skip");
   const audit = useQuery(api.adminOps.listAudit, sessionUserId ? { sessionUserId } : "skip");
-  const queue = useQuery(api.visits.listQueue);
   const setRole = useMutation(api.auth.setUserRole);
   const saveKb = useMutation(api.adminOps.saveKnowledge);
   const deleteKb = useMutation(api.adminOps.deleteKnowledge);
@@ -45,67 +44,76 @@ function AdminApp() {
   if (!sessionUserId) return null;
 
   return (
-    <main className="mx-auto max-w-[1100px] space-y-10 px-4 py-8 md:px-8">
-      <div>
-        <p className="tl-overline">Cadence</p>
-        <h1 className="mt-2 text-3xl">Admin</h1>
-        <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.08em] text-ash">
-          Knowledge base is not auto-diagnosis. Practitioner remains clinical authority.
+    <main className="mx-auto max-w-[1300px] space-y-8 pb-16">
+      <div className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Operations Desk</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mt-0.5">Admin & Governance Station</h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Knowledge base governance, user access management, and clinical audit integrity.
         </p>
       </div>
 
-      <section>
-        <h2 className="text-xl">System analytics</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Users" value={sys?.users ?? 0} />
+      <section className="space-y-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">System Metrics</p>
+          <h2 className="text-xl font-bold text-slate-900">Platform Analytics</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <Stat label="Total Users" value={sys?.users ?? 0} />
           <Stat label="Practitioners" value={sys?.practitioners ?? 0} />
           <Stat label="Dietitians" value={sys?.dietitians ?? 0} />
-          <Stat label="Documents" value={sys?.documents ?? 0} />
-          <Stat label="Visits" value={stats?.total ?? sys?.visits ?? 0} />
-          <Stat label="Awaiting doctor" value={stats?.awaitingDoctor ?? 0} />
-          <Stat label="Approved" value={stats?.approved ?? 0} />
-          <Stat label="Open issues" value={sys?.openIssues ?? 0} />
-          <Stat label="ABHA consent" value={`${Math.round((stats?.abhaConsentRate ?? 0) * 100)}%`} />
+          <Stat label="Documents OCR" value={sys?.documents ?? 0} />
+          <Stat label="Total Visits" value={stats?.total ?? sys?.visits ?? 0} />
+          <Stat label="Awaiting Doctor" value={stats?.awaitingDoctor ?? 0} />
+          <Stat label="Approved Visits" value={stats?.approved ?? 0} />
+          <Stat label="Open Issues" value={sys?.openIssues ?? 0} />
+          <Stat label="ABHA Consent" value={`${Math.round((stats?.abhaConsentRate ?? 0) * 100)}%`} />
         </div>
       </section>
 
-      <section>
-        <h2 className="text-xl">Users / roles / permissions</h2>
-        <ul className="mt-3 space-y-2">
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <h2 className="text-lg font-bold text-slate-900">Users, Roles & Access Control</h2>
+        <ul className="space-y-2">
           {users?.map((u) => (
-            <li key={u._id} className="tl-card flex flex-wrap items-center gap-2 px-3 py-2">
-              <span className="flex-1 font-mono text-sm">
-                {u.email} · {u.role} · {u.active ? "active" : "off"}
+            <li key={u._id} className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
+              <span className="font-mono font-medium text-slate-800">
+                {u.email} · <span className="font-bold text-sky-800 uppercase">{u.role}</span> · {u.active ? "✓ active" : "off"}
               </span>
-              {(["patient", "practitioner", "dietitian", "admin"] as Role[]).map((role) => (
-                <button
-                  key={role}
-                  className="btn-ghost px-2 py-1 text-[10px]"
-                  onClick={() => void setRole({ sessionUserId, targetUserId: u._id, role })}
-                >
-                  {role}
-                </button>
-              ))}
+              <div className="flex gap-1.5">
+                {(["patient", "practitioner", "dietitian", "admin"] as Role[]).map((role) => (
+                  <button
+                    key={role}
+                    className={`rounded-full px-3 py-1 text-[10px] font-semibold transition-all ${
+                      u.role === role ? "bg-[#1b343f] text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                    onClick={() => void setRole({ sessionUserId, targetUserId: u._id, role })}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
       </section>
 
-      <section>
-        <h2 className="text-xl">Ayurveda knowledge base</h2>
-        <p className="text-sm text-mist">Articles and prompts. Never applied as a diagnosis.</p>
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Ayurveda Knowledge Base</h2>
+          <p className="text-xs text-slate-500">Articles and prompts. Never applied as autonomous diagnosis.</p>
+        </div>
         <select
-          className="tl-input mt-2"
+          className="tl-input"
           value={kbKind}
           onChange={(e) => setKbKind(e.target.value as "article" | "prompt")}
         >
           <option value="article">article</option>
           <option value="prompt">prompt</option>
         </select>
-        <input className="tl-input mt-2" placeholder="Title" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)} />
-        <textarea className="tl-input mt-2" rows={4} value={kbBody} onChange={(e) => setKbBody(e.target.value)} />
+        <input className="tl-input" placeholder="Title" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)} />
+        <textarea className="tl-input" rows={3} value={kbBody} onChange={(e) => setKbBody(e.target.value)} placeholder="Content / guidelines..." />
         <button
-          className="btn-pulse mt-2 px-4 py-2"
+          className="btn-pulse px-4 py-2 text-xs font-semibold"
           onClick={async () => {
             if (!kbTitle.trim()) return;
             await saveKb({ sessionUserId, kind: kbKind, title: kbTitle, body: kbBody });
@@ -113,56 +121,59 @@ function AdminApp() {
             setKbBody("");
           }}
         >
-          Save entry
+          Save Knowledge Entry
         </button>
-        {kb?.map((row) => (
-          <article key={row._id} className="tl-card mt-3 p-3">
-            <p className="tl-tag">{row.kind}</p>
-            <h3 className="text-lg">{row.title}</h3>
-            <p className="whitespace-pre-wrap text-mist">{row.body}</p>
-            <button
-              className="btn-ghost mt-2 px-3 py-1 text-xs"
-              onClick={() => void deleteKb({ sessionUserId, entryId: row._id })}
-            >
-              Delete
-            </button>
-          </article>
-        ))}
-      </section>
-
-      <section>
-        <h2 className="text-xl">Documents (queue extracts)</h2>
-        <ol className="mt-2 space-y-1 font-mono text-sm">
-          {queue?.map((v) => (
-            <li key={v._id} className="tl-surface px-3 py-2">
-              {v.status} · {v.pathway} · kiosk {v.kioskId}
-            </li>
+        <div className="grid gap-3 sm:grid-cols-2 pt-2">
+          {kb?.map((row) => (
+            <article key={row._id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 uppercase">
+                {row.kind}
+              </span>
+              <h3 className="text-sm font-bold text-slate-900">{row.title}</h3>
+              <p className="text-xs text-slate-600 line-clamp-3">{row.body}</p>
+              <button
+                className="btn-ghost px-3 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                onClick={() => void deleteKb({ sessionUserId, entryId: row._id })}
+              >
+                Delete
+              </button>
+            </article>
           ))}
-        </ol>
+        </div>
       </section>
 
-      <section>
-        <h2 className="text-xl">Audit (doctorEdits + admin actions)</h2>
-        <ul className="mt-2 max-h-80 space-y-2 overflow-auto">
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <h2 className="text-lg font-bold text-slate-900">Audit Trail (Immutable Ledger Log)</h2>
+        <ul className="max-h-72 space-y-2 overflow-auto">
           {audit?.map((row, i) => (
-            <li key={`${row.createdAt}-${i}`} className="tl-card px-3 py-2 font-mono text-xs">
-              {new Date(row.createdAt).toLocaleString()} · {row.action} · {row.target}
-              <pre className="mt-1 whitespace-pre-wrap text-ash">{row.payloadJson}</pre>
+            <li key={`${row.createdAt}-${i}`} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 font-mono text-xs text-slate-700">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">{row.action}</span>
+                <span className="text-slate-400 text-[10px]">{new Date(row.createdAt).toLocaleString()}</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">Target: {row.target}</p>
+              <pre className="mt-1 max-h-24 overflow-auto rounded-xl bg-white p-2 text-[10px] text-slate-600 border border-slate-200 whitespace-pre-wrap">
+                {row.payloadJson}
+              </pre>
             </li>
           ))}
         </ul>
       </section>
 
-      <section>
-        <h2 className="text-xl">Reported issues</h2>
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <h2 className="text-lg font-bold text-slate-900">Reported Issues & Feedback</h2>
         <IssueBox sessionUserId={sessionUserId} />
-        {issues?.map((issue) => (
-          <article key={issue._id} className="tl-card mt-2 p-3">
-            <p className="tl-tag">{issue.status}</p>
-            <h3>{issue.title}</h3>
-            <p className="text-mist">{issue.body}</p>
-          </article>
-        ))}
+        <div className="grid gap-3 sm:grid-cols-2 pt-2">
+          {issues?.map((issue) => (
+            <article key={issue._id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+              <span className="rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 uppercase">
+                {issue.status}
+              </span>
+              <h3 className="text-sm font-bold text-slate-900 mt-1">{issue.title}</h3>
+              <p className="text-xs text-slate-600">{issue.body}</p>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );
@@ -173,11 +184,11 @@ function IssueBox({ sessionUserId }: { sessionUserId: Id<"users"> }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   return (
-    <div className="tl-surface mb-3 space-y-2 p-3">
-      <input className="tl-input" placeholder="Issue title" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <textarea className="tl-input" rows={2} value={body} onChange={(e) => setBody(e.target.value)} />
+    <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3">
+      <input className="tl-input" placeholder="Issue title..." value={title} onChange={(e) => setTitle(e.target.value)} />
+      <textarea className="tl-input" rows={2} placeholder="Describe the problem or clinical anomaly..." value={body} onChange={(e) => setBody(e.target.value)} />
       <button
-        className="btn-ghost px-3 py-1 text-sm"
+        className="btn-pulse px-4 py-1.5 text-xs font-semibold"
         onClick={async () => {
           if (!title.trim()) return;
           await reportIssue({ sessionUserId, title, body });
@@ -185,7 +196,7 @@ function IssueBox({ sessionUserId }: { sessionUserId: Id<"users"> }) {
           setBody("");
         }}
       >
-        File issue
+        File Issue
       </button>
     </div>
   );
@@ -193,9 +204,10 @@ function IssueBox({ sessionUserId }: { sessionUserId: Id<"users"> }) {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="tl-surface p-4">
-      <p className="tl-overline">{label}</p>
-      <p className="mt-2 font-mono text-3xl text-display">{value}</p>
+    <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-1.5 font-mono text-2xl font-bold text-slate-900">{value}</p>
     </div>
   );
 }
+

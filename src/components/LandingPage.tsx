@@ -14,10 +14,10 @@ function Rail({ steps }: { steps: readonly string[] }) {
       {steps.map((step, i) => (
         <li key={step} className="flex gap-3">
           <div className="flex w-6 flex-col items-center">
-            <span className="mt-1 h-2 w-2 rounded-full bg-pulse" />
-            {i < steps.length - 1 ? <span className="w-px flex-1 bg-graphite" /> : null}
+            <span className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-xs" />
+            {i < steps.length - 1 ? <span className="w-0.5 flex-1 bg-slate-200" /> : null}
           </div>
-          <p className="pb-4 font-mono text-sm text-body">{step}</p>
+          <p className="pb-4 font-mono text-xs text-slate-700 font-medium">{step}</p>
         </li>
       ))}
     </ol>
@@ -26,148 +26,149 @@ function Rail({ steps }: { steps: readonly string[] }) {
 
 export function LandingPage() {
   return (
-    <div className="landing-root">
-      <section className="relative overflow-hidden border-b border-graphite px-4 py-16 md:px-10 md:py-24">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.07]">
-          <div className="absolute -top-24 right-8 h-72 w-72 rotate-12 border border-pulse" />
-          <div className="absolute bottom-8 left-12 h-40 w-40 border border-graphite" />
+    <div className="space-y-12 max-w-6xl mx-auto pb-16">
+      {/* Hero Banner */}
+      <section className="rounded-3xl bg-gradient-to-br from-[#18313c] via-[#234554] to-[#2d5668] text-white p-8 md:p-14 shadow-sm relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 opacity-20">
+          <div className="absolute -top-24 right-8 h-96 w-96 rounded-full bg-sky-400 blur-3xl" />
+          <div className="absolute bottom-8 left-12 h-64 w-64 rounded-full bg-emerald-400 blur-3xl" />
         </div>
-        <p className="tl-overline">PS 26047 · Ministry of AYUSH / AIIA</p>
-        <h1 className="mt-4 max-w-3xl text-5xl leading-none md:text-7xl">My Aura</h1>
-        <p className="mt-6 max-w-2xl text-lg text-mist">
-          Operator console for Ayurvedic OPD intake. The kiosk takes history in the patient&apos;s language
-          before the consult. The practitioner approves every clinical field. The model never diagnoses.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/login/patient" className="btn-pulse px-6 py-3">
-            Patient login
-          </Link>
-          <Link href="/login/doctor" className="btn-ghost px-6 py-3">
-            Practitioner login
-          </Link>
-          <Link href="/login/admin" className="btn-ghost px-6 py-3">
-            Admin login
-          </Link>
-          <Link href="/kiosk" className="btn-ghost px-6 py-3">
-            Walk-up kiosk
-          </Link>
+
+        <div className="relative z-10 max-w-3xl space-y-4">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1 text-xs font-semibold backdrop-blur-md text-sky-100">
+            <span>🌿</span> PS 26047 · Ministry of AYUSH / AIIA
+          </span>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight text-white">
+            Ayurvedic OPD Case Taking & Clinical Station
+          </h1>
+          <p className="text-sm md:text-base text-slate-200 leading-relaxed max-w-2xl">
+            Voice-guided intake in the patient&apos;s language before the consult. Practitioner maintains final clinical authority over every field. The AI assists but never makes autonomous diagnoses.
+          </p>
+
+          <div className="pt-4 flex flex-wrap gap-3">
+            <Link href="/login/patient" className="rounded-full bg-white text-slate-900 px-6 py-3 text-xs font-bold hover:bg-slate-100 shadow-sm transition-all">
+              Patient Portal
+            </Link>
+            <Link href="/login/doctor" className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all">
+              Practitioner Login
+            </Link>
+            <Link href="/login/admin" className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30 px-6 py-3 text-xs font-bold transition-all">
+              Admin Login
+            </Link>
+            <Link href="/kiosk" className="rounded-full bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 text-xs font-bold shadow-sm transition-all">
+              Walk-up Kiosk 🌿
+            </Link>
+          </div>
+
+          <p className="pt-2 font-mono text-[11px] tracking-wider text-slate-300 uppercase">
+            Never auto-diagnostic · 10 Indic Languages · Sarvam AI & Local Offline Engine
+          </p>
         </div>
-        <p className="mt-6 font-mono text-[11px] tracking-[0.12em] text-ash uppercase">
-          Never auto-diagnostic · Practitioner has final authority
-        </p>
       </section>
 
-      <section id="how-it-works" className="border-b border-graphite px-4 py-14 md:px-10">
-        <p className="tl-overline">Website flow</p>
-        <h2 className="mt-2 text-3xl">How you move through My Aura</h2>
-        <ol className="mt-8 grid gap-3 md:grid-cols-4">
+      {/* How it Works Grid */}
+      <section id="how-it-works" className="space-y-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Website Flow</p>
+          <h2 className="text-2xl font-bold text-slate-900">How You Move Through My Aura</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { n: "01", t: "Landing", d: "See every capability. No login required." },
-            { n: "02", t: "Login", d: "Patient or admin first. Clinic staff use a separate gate." },
-            { n: "03", t: "Your station", d: "Patient portal, admin cadence, or clinic consoles." },
-            { n: "04", t: "Care loop", d: "Intake → practitioner review → dietitian if referred → follow-up." },
+            { n: "01", t: "Landing & Overview", d: "Explore capabilities, clinical safety rules, and architecture." },
+            { n: "02", t: "Role Authentication", d: "Role-specific PIN gateways with instant demo seeding." },
+            { n: "03", t: "Clinical Workstation", d: "Patient dashboard, practitioner OPD desk, or dietitian studio." },
+            { n: "04", t: "Ayurvedic Care Loop", d: "SOCRATES intake → Dashavidha exam → Dietitian referral → FHIR export." },
           ].map((step) => (
-            <li key={step.n} className="tl-card p-5">
-              <p className="tl-overline">{step.n}</p>
-              <p className="mt-2 text-xl text-display">{step.t}</p>
-              <p className="mt-2 text-mist">{step.d}</p>
-            </li>
+            <div key={step.n} className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-sky-100 text-sky-900 font-mono text-xs font-bold">
+                {step.n}
+              </span>
+              <p className="text-base font-bold text-slate-900">{step.t}</p>
+              <p className="text-xs text-slate-500 leading-relaxed">{step.d}</p>
+            </div>
           ))}
-        </ol>
-        <p className="mt-6 text-sm text-ash">
-          Walk-up kiosk skips login for floor intake, then the practitioner still approves the record.
-        </p>
+        </div>
       </section>
 
-      <section className="border-b border-graphite px-4 py-14 md:px-10">
-        <p className="tl-overline">Capabilities</p>
-        <h2 className="mt-2 text-3xl">Everything on the floor</h2>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Capabilities */}
+      <section className="space-y-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Capabilities</p>
+          <h2 className="text-2xl font-bold text-slate-900">Everything on the Clinic Floor</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {LANDING_FEATURES.map((f) => (
-            <article key={f.title} className="tl-card p-5">
-              <p className="tl-overline">{f.overline}</p>
-              <h3 className="mt-2 text-xl">{f.title}</h3>
-              <p className="mt-2 text-mist">{f.copy}</p>
+            <article key={f.title} className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-2">
+              <span className="rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-0.5 uppercase">
+                {f.overline}
+              </span>
+              <h3 className="text-base font-bold text-slate-900">{f.title}</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">{f.copy}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="grid border-b border-graphite md:grid-cols-3">
-        <div className="border-b border-graphite px-4 py-10 md:border-r md:border-b-0 md:px-10">
-          <p className="tl-overline">Architecture</p>
-          <h2 className="mt-2 text-2xl">Signal path</h2>
+      {/* Architecture Rails */}
+      <section className="grid gap-6 md:grid-cols-3">
+        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Architecture</p>
+          <h2 className="text-lg font-bold text-slate-900 mt-1">Signal Path</h2>
           <Rail steps={PIPELINE_STAGES} />
         </div>
-        <div className="border-b border-graphite px-4 py-10 md:border-r md:border-b-0 md:px-10">
-          <p className="tl-overline">Case spine</p>
-          <h2 className="mt-2 text-2xl">Interview order</h2>
+        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Case Spine</p>
+          <h2 className="text-lg font-bold text-slate-900 mt-1">Interview Order</h2>
           <Rail steps={CASE_SPINE} />
         </div>
-        <div className="px-4 py-10 md:px-10">
-          <p className="tl-overline">Documents</p>
-          <h2 className="mt-2 text-2xl">Paper in, review out</h2>
+        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Documents</p>
+          <h2 className="text-lg font-bold text-slate-900 mt-1">Physical OCR Pipeline</h2>
           <Rail steps={DOCUMENT_STAGES} />
         </div>
       </section>
 
-      <section className="border-b border-graphite px-4 py-14 md:px-10">
-        <p className="tl-overline">Dashavidha</p>
-        <h2 className="mt-2 text-3xl">Ten factors. No AI dosha label.</h2>
-        <ul className="mt-8 grid grid-cols-2 gap-2 md:grid-cols-5">
+      {/* Dashavidha Factors */}
+      <section className="space-y-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Dashavidha Pariksha</p>
+          <h2 className="text-2xl font-bold text-slate-900">Ten Classical Factors Evaluated</h2>
+        </div>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {DASHAVIDHA_FACTORS.map((factor) => (
-            <li key={factor} className="tl-surface px-3 py-3 font-mono text-sm text-display">
+            <li key={factor} className="rounded-2xl bg-white p-3.5 font-mono text-xs font-bold text-slate-800 shadow-xs border border-slate-100 text-center">
               {factor}
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="border-b border-graphite px-4 py-14 md:px-10">
-        <p className="tl-overline">Stations</p>
-        <h2 className="mt-2 text-3xl">Four roles</h2>
-        <div className="mt-8 grid gap-3 lg:grid-cols-2">
+      {/* Roles Selection */}
+      <section className="space-y-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Role Stations</p>
+          <h2 className="text-2xl font-bold text-slate-900">Four Purpose-Built Consoles</h2>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
           {LANDING_ROLES.map((role) => (
             <Link
               key={role.overline}
               href={role.href}
-              className="tl-card block p-5 transition-colors hover:border-pulse"
+              className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 block hover:border-sky-300 hover:shadow-md transition-all group"
             >
-              <p className="tl-overline">Role {role.overline}</p>
-              <p className="mt-1 text-2xl text-display">{role.title}</p>
-              <p className="mt-2 text-mist">{role.copy}</p>
-              <span className="btn-ghost mt-4 px-4 py-2 text-sm">Sign in</span>
+              <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5 uppercase">
+                {role.overline}
+              </span>
+              <p className="text-xl font-bold text-slate-900 mt-2 group-hover:text-sky-900 transition-colors">{role.title}</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">{role.copy}</p>
+              <span className="btn-pulse mt-4 px-4 py-1.5 text-xs font-semibold inline-block">
+                Sign in to station →
+              </span>
             </Link>
           ))}
-        </div>
-      </section>
-
-      <section className="border-b border-graphite px-4 py-14 md:px-10">
-        <p className="tl-overline">Integrity</p>
-        <h2 className="mt-2 text-3xl">What we refuse to claim</h2>
-        <ul className="mt-6 max-w-2xl space-y-2 text-mist">
-          <li>Live ABDM sandbox push — FHIR is generated and posted to a local HIS simulator.</li>
-          <li>Handwriting OCR accuracy — low-confidence lines wait for the practitioner.</li>
-          <li>Wearable vitals — out of scope; vitals are self-reported when captured.</li>
-          <li>Uniform dialect ASR — regional languages are offered with an explicit quality flag.</li>
-        </ul>
-      </section>
-
-      <section className="px-4 py-14 md:px-10">
-        <p className="tl-overline">Start</p>
-        <h2 className="mt-2 text-3xl">Pick a gate</h2>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/login/patient" className="btn-pulse px-6 py-3">
-            Patient login
-          </Link>
-          <Link href="/login/doctor" className="btn-ghost px-6 py-3">
-            Practitioner login
-          </Link>
-          <Link href="/login/admin" className="btn-ghost px-6 py-3">
-            Admin login
-          </Link>
         </div>
       </section>
     </div>
   );
 }
+
