@@ -7,6 +7,32 @@ function asKind(value: FormDataEntryValue | null): DocumentKind {
   return "scan";
 }
 
+async function extractWithSarvam(file: Blob, apiKey: string): Promise<{ text: string; confidence: number } | null> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("https://api.sarvam.ai/document-ai", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": apiKey,
+      },
+      body: formData,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      text?: string;
+      extracted_text?: string;
+      content?: string;
+      confidence?: number;
+    };
+    const text = (data.text || data.extracted_text || data.content || "").trim();
+    const confidence = typeof data.confidence === "number" ? data.confidence : 0.88;
+    return { text, confidence };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const form = await request.formData();
   const file = form.get("file");
@@ -16,14 +42,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await Tesseract.recognize(buffer, "eng");
-    const text = result.data.text.trim();
-    const confidence = (result.data.confidence ?? 0) / 100;
+    let text = "";
+    let confidence = 0;
+    let engine: "sarvam" | "tesseract" = "tesseract";
+
+    const sarvamApiKey = process.env.SARVAM_API_KEY;
+    if (sarvamApiKey) {
+      const sarvamResult = await extractWithSarvam(file, sarvamApiKey);
+      if (sarvamResult && sarvamResult.text) {
+        text = sarvamResult.text;
+        confidence = sarvamResult.confidence;
+        engine = "sarvam";
+      }
+    }
+
+    if (!text) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const result = await Tesseract.recognize(buffer, "eng");
+      text = result.data.text.trim();
+      confidence = (result.data.confidence ?? 0) / 100;
+      engine = "tesseract";
+    }
+
     const meta = buildDocumentExtractMeta({ kind, rawText: text, confidence });
     return NextResponse.json({
       text,
       confidence: meta.confidence,
+      engine,
       kind: meta.kind,
       reviewRequired: meta.reviewRequired,
       handwritingLikely: meta.handwritingLikely,
@@ -50,3 +95,4 @@ export async function POST(request: Request) {
     });
   }
 }
+

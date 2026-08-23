@@ -1,5 +1,35 @@
 export type DocumentKind = "prescription" | "lab" | "scan";
 
+export type ConfidenceTier = "high" | "review" | "low";
+
+export type ConfidenceBadge = {
+  tier: ConfidenceTier;
+  label: string;
+  color: string;
+};
+
+export function getConfidenceBadge(confidence: number): ConfidenceBadge {
+  if (confidence >= 0.7) {
+    return {
+      tier: "high",
+      label: "High Confidence",
+      color: "text-success",
+    };
+  }
+  if (confidence >= 0.5) {
+    return {
+      tier: "review",
+      label: "Review Required",
+      color: "text-warning",
+    };
+  }
+  return {
+    tier: "low",
+    label: "Low Confidence / Scrawl",
+    color: "text-pulse",
+  };
+}
+
 export type DocumentExtractMeta = {
   kind: DocumentKind;
   confidence: number;
@@ -13,6 +43,7 @@ export type DocumentExtractMeta = {
   attachedToVisit: true;
   mergedIntoClinicalSlots: false;
 };
+
 
 const MEDICINE_HINTS = [
   "mg",
