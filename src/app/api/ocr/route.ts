@@ -7,6 +7,8 @@ function asKind(value: FormDataEntryValue | null): DocumentKind {
   return "scan";
 }
 
+export const maxDuration = 30;
+
 async function extractWithSarvam(file: Blob, apiKey: string): Promise<{ text: string; confidence: number } | null> {
   try {
     const formData = new FormData();
@@ -31,9 +33,9 @@ async function extractWithSarvam(file: Blob, apiKey: string): Promise<{ text: st
     const { job_id } = (await res.json()) as { job_id?: string };
     if (!job_id) return null;
 
-    // Poll for completion (up to 12 iterations)
-    for (let i = 0; i < 12; i++) {
-      await new Promise((r) => setTimeout(r, 1200));
+    // Fast polling: check every 600ms, up to 8 times (~4.8s max)
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 600));
       const poll = await fetch(`https://api.sarvam.ai/doc-ai/v1/job/${job_id}/status`, {
         headers: { "api-subscription-key": apiKey },
       });
@@ -86,6 +88,7 @@ async function extractWithSarvam(file: Blob, apiKey: string): Promise<{ text: st
     return null;
   }
 }
+
 
 
 export async function POST(request: Request) {

@@ -271,16 +271,24 @@ export function KioskWizard({
       const form = new FormData();
       form.set("file", file);
       form.set("kind", docKind);
-      const ocr = await fetch("/api/ocr", { method: "POST", body: form });
-      const result = (await ocr.json()) as {
+      let result: {
         text?: string;
         confidence?: number;
         failed?: boolean;
         note?: string;
         reviewRequired?: boolean;
         structured?: DocumentExtractMeta;
-      };
+      } = {};
+      try {
+        const ocr = await fetch("/api/ocr", { method: "POST", body: form });
+        if (ocr.ok) {
+          result = (await ocr.json()) as typeof result;
+        }
+      } catch (err) {
+        console.warn("Kiosk OCR fetch failed:", err);
+      }
       setDocStage("meta");
+
       const meta =
         result.structured ??
         ({

@@ -120,28 +120,35 @@ function PractitionerApp() {
   async function handleDoctorUpload(file: File, kind: DocumentKind) {
     if (!selected) {
       setNotice("Please select a visit from the queue to attach documents.");
-      return;
+      throw new Error("Please select a patient visit from the queue first.");
     }
     try {
       const uploadUrl = await generateUploadUrl();
-      const res = await fetch(uploadUrl, {
+      const storagePromise = fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
+      }).then(async (res) => {
+        if (!res.ok) throw new Error("File upload to storage failed");
+        return (await res.json()) as { storageId: Id<"_storage"> };
       });
-      if (!res.ok) throw new Error("File upload to storage failed");
-      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
 
       const ocrForm = new FormData();
       ocrForm.append("file", file);
       ocrForm.append("kind", kind);
-      const ocrRes = await fetch("/api/ocr", { method: "POST", body: ocrForm });
-      const ocrData = (await ocrRes.json()) as {
-        text?: string;
-        confidence?: number;
-        structured?: object;
-        failed?: boolean;
-      };
+      const ocrPromise = fetch("/api/ocr", { method: "POST", body: ocrForm })
+        .then(async (res) => {
+          if (!res.ok) return { text: "", confidence: 0, failed: true, structured: {} };
+          return (await res.json()) as {
+            text?: string;
+            confidence?: number;
+            structured?: object;
+            failed?: boolean;
+          };
+        })
+        .catch(() => ({ text: "", confidence: 0, failed: true, structured: {} }));
+
+      const [{ storageId }, ocrData] = await Promise.all([storagePromise, ocrPromise]);
 
       await attachDocument({
         visitId: selected,
@@ -154,9 +161,12 @@ function PractitionerApp() {
       });
       setNotice(`Document attached (${kind}). Doctor review required before visit approval.`);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Document upload failed");
+      const msg = e instanceof Error ? e.message : "Document upload failed";
+      setNotice(msg);
+      throw new Error(msg);
     }
   }
+
 
   async function handleDoctorReview(
     extractId: Id<"documentExtracts">,

@@ -72,34 +72,43 @@ export function PatientStation({
   const [practId, setPractId] = useState<Id<"users"> | "">("");
 
   async function handlePatientUpload(file: File, kind: DocumentKind) {
-    const postUrl = await generateUploadUrl({});
-    const result = await fetch(postUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
-      body: file,
+    const postUrlPromise = generateUploadUrl({}).then(async (postUrl) => {
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!result.ok) throw new Error("File upload failed");
+      return (await result.json()) as { storageId: Id<"_storage"> };
     });
-    if (!result.ok) throw new Error("File upload failed");
-    const json = (await result.json()) as { storageId: Id<"_storage"> };
 
     const ocrForm = new FormData();
     ocrForm.append("file", file);
     ocrForm.append("kind", kind);
-    const ocrRes = await fetch("/api/ocr", { method: "POST", body: ocrForm });
-    const ocrData = (await ocrRes.json()) as {
-      text?: string;
-      confidence?: number;
-      structured?: object;
-      failed?: boolean;
-    };
+    const ocrPromise = fetch("/api/ocr", { method: "POST", body: ocrForm })
+      .then(async (res) => {
+        if (!res.ok) return { text: "", confidence: 0, failed: true, structured: {} };
+        return (await res.json()) as {
+          text?: string;
+          confidence?: number;
+          structured?: object;
+          failed?: boolean;
+        };
+      })
+      .catch(() => ({ text: "", confidence: 0, failed: true, structured: {} }));
+
+    const [json, ocrData] = await Promise.all([postUrlPromise, ocrPromise]);
 
     let activeVisitId = visits?.[0]?._id;
     if (!activeVisitId) {
       activeVisitId = await startVisit({
+        sessionUserId,
         displayName,
         languageCode: "en-IN",
         pathway: "ayush",
         answeredBy: "patient",
         kioskId: "patient-portal",
+
         shareHistory: true,
         shareAyush: true,
         shareAbha: false,
@@ -150,9 +159,9 @@ export function PatientStation({
           },
           patientRecapConfirmed: false,
         }),
-        sessionUserId,
       });
     }
+
 
     await attachDocument({
       visitId: activeVisitId,
