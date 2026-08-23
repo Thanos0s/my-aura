@@ -383,6 +383,30 @@ export function isFilled(slot?: Slot): boolean {
 }
 
 /** Fields already answered in this consultation — used so we never re-ask. */
+export function conversationFacts(state: IntakeState, extra = ""): Record<string, string> {
+  const chunks = [
+    extra,
+    state.socrates.chiefComplaint?.value,
+    ...Object.values(state.complaintAnswers ?? {}),
+    ...(state.chatHistory ?? []).map((e) => e.answer),
+  ];
+  return harvestImpliedAnswers(chunks.filter(Boolean).join("\n"), "");
+}
+
+/** Intents already covered by answers or by scanning the whole transcript. */
+export function coveredFields(state: IntakeState): Set<string> {
+  const fields = answeredFields(state);
+  const facts = conversationFacts(state);
+  for (const key of Object.keys(facts)) fields.add(key);
+  // One combined history question covers these overlapping follow-ups.
+  if (fields.has("onset") && fields.has("medication")) {
+    fields.add("history_bundle");
+    fields.add("trigger");
+    fields.add("character_location");
+  }
+  return fields;
+}
+
 export function answeredFields(state: IntakeState): Set<string> {
   const fields = new Set<string>(Object.keys(state.complaintAnswers ?? {}));
   for (const exchange of state.chatHistory ?? []) {
@@ -416,7 +440,7 @@ export function harvestImpliedAnswers(
   }
 
   const noMed =
-    /(कोई\s*दवा\s*नहीं|दवा\s*नहीं\s*ली|दवाई\s*नहीं|दवाई\s*ली\s*नहीं|दवा\s*ली\s*नहीं|नहीं\s*ली\s*है\s*दवा|कोई\s*दवाई\s*ली\s*नहीं|no\s+medicine|haven'?t\s+taken\s+any\s+medicine|did\s+not\s+take\s+medicine|not\s+taken\s+any\s+(medicine|tablet))/i.test(
+    /(कोई\s*दवा\s*नहीं|दवा\s*नहीं\s*ली|दवाई\s*नहीं|दवाई\s*ली\s*नहीं|दवा\s*ली\s*नहीं|नहीं\s*ली\s*है\s*दवा|कोई\s*दवाई\s*ली\s*नहीं|दवाई?.{0,12}नहीं|नहीं.{0,12}दवाई?|no\s+medicine|haven'?t\s+taken\s+any\s+medicine|did\s+not\s+take\s+medicine|not\s+taken\s+any\s+(medicine|tablet))/i.test(
       t
     );
   const yesMed =
@@ -443,6 +467,12 @@ export function harvestImpliedAnswers(
     /(बढ़ता|ठीक\s*होता|आराम|worse|better|after\s+food|खाने\s*के\s*बाद|rest\s+helps)/i.test(t);
   if (triggerCue && currentField !== "trigger" && !out.trigger) {
     out.trigger = t;
+  }
+
+  const wantsTests =
+    /(जांच|जाँच|टेस्ट|test\s*needed|need\s+tests|want\s+tests)/i.test(t);
+  if (wantsTests && currentField !== "notes") {
+    out.notes = t;
   }
 
   // Don't overwrite the field we are actively answering with a harvest copy.
@@ -573,18 +603,21 @@ export function nextQuestion(state: IntakeState): Prompt {
       };
     }
 
-    // Heal matched complaint from chief complaint if id was lost (e.g. reload)
-    let matchedId = state.matchedComplaintId;
-    if (!matchedId && isFilled(state.socrates.chiefComplaint)) {
-      matchedId = matchChiefComplaint(state.socrates.chiefComplaint.value).id;
-    }
-
-    const answered = answeredFields(state);
     const hadComplaintInterview =
+      Boolean(state.matchedComplaintId) ||
       Object.keys(state.complaintAnswers ?? {}).length > 0 ||
       (state.chatHistory ?? []).some(
         (e) => e.field && e.field !== "chiefComplaint"
-      );
+      ) ||
+      (state.chatHistory ?? []).some((e) => e.field === "chiefComplaint");
+
+    // Recover a lost match only if this visit already started the complaint chat.
+    let matchedId = state.matchedComplaintId;
+    if (!matchedId && hadComplaintInterview && isFilled(state.socrates.chiefComplaint)) {
+      matchedId = matchChiefComplaint(state.socrates.chiefComplaint.value).id;
+    }
+
+    const answered = coveredFields(state);
 
     // If a specific matched complaint is in progress (or recoverable)
     if (matchedId) {
@@ -777,11 +810,12 @@ export function applySlotAnswer(
         timestamp: Date.now(),
       };
 
+      const impliedFromChief = harvestImpliedAnswers(value, "chiefComplaint");
       let nextState: IntakeState = {
         ...state,
         matchedComplaintId: matched.id,
         complaintQuestionIndex: 0,
-        complaintAnswers: {},
+        complaintAnswers: { ...impliedFromChief },
         chatHistory: [exchange],
         socrates: { ...state.socrates, chiefComplaint: fillSlot(source, value, 1) },
       };
@@ -789,7 +823,10 @@ export function applySlotAnswer(
       if (matched.id === "general_other" && value.trim()) {
         nextState = {
           ...nextState,
-          complaintAnswers: { character_location: value.trim() },
+          complaintAnswers: {
+            character_location: value.trim(),
+            ...impliedFromChief,
+          },
         };
         nextState = mapComplaintFieldToState(
           nextState,
@@ -797,11 +834,14 @@ export function applySlotAnswer(
           value.trim(),
           source
         );
+        for (const [field, harvested] of Object.entries(impliedFromChief)) {
+          nextState = mapComplaintFieldToState(nextState, field, harvested, source);
+        }
         nextState = {
           ...nextState,
           complaintQuestionIndex: firstUnansweredComplaintIndex(
             matched,
-            answeredFields(nextState),
+            coveredFields(nextState),
             0
           ),
         };
@@ -840,17 +880,7 @@ export function applySlotAnswer(
       timestamp: Date.now(),
     };
 
-    const harvestExchanges: ChatExchange[] = Object.entries(implied).map(
-      ([field, harvested]) => ({
-        id: `q-${field}-harvest-${Date.now()}`,
-        question: `[from prior answer] ${field}`,
-        answer: harvested,
-        field,
-        timestamp: Date.now(),
-      })
-    );
-
-    const newChatHistory = [...existingHistory, exchange, ...harvestExchanges];
+    const newChatHistory = [...existingHistory, exchange];
 
     const provisional = {
       ...mapped,
@@ -859,7 +889,7 @@ export function applySlotAnswer(
     };
 
     const nextQIndex = complaint
-      ? firstUnansweredComplaintIndex(complaint, answeredFields(provisional), 0)
+      ? firstUnansweredComplaintIndex(complaint, coveredFields(provisional), 0)
       : qIndex + 1;
 
     if (complaint && complaint.redFlag && nextQIndex >= complaint.questions.length) {

@@ -156,11 +156,19 @@ export function KioskWizard({
   // Derived Conversational History for Point-wise Chatbot UI
   const conversationHistory = useMemo(() => {
     if (state.chatHistory && state.chatHistory.length > 0) {
-      return state.chatHistory.map((item) => ({
-        id: item.id,
-        question: item.question,
-        answer: item.answer,
-      }));
+      const seenFields = new Set<string>();
+      return state.chatHistory
+        .filter((item) => {
+          if (!item.field || seenFields.has(item.field)) return false;
+          if (item.question.startsWith("[from prior")) return false;
+          seenFields.add(item.field);
+          return true;
+        })
+        .map((item) => ({
+          id: item.id,
+          question: item.question,
+          answer: item.answer,
+        }));
     }
 
     const list: Array<{ id: string; question: string; answer: string }> = [];
@@ -325,7 +333,12 @@ export function KioskWizard({
       );
     }
 
-    const follow = nextQuestion(next);
+    let follow = nextQuestion(next);
+
+    // Safety: never speak the same slot twice in a row.
+    if (follow.kind === "ask" && follow.id === prompt.id) {
+      follow = { kind: "complete" };
+    }
 
     if (follow.kind === "complete") {
       next = { ...next, phase: "documents" };
