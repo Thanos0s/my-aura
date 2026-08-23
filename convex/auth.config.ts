@@ -1,6 +1,6 @@
 import { FIREBASE_AUTH_PROJECT_ID } from "./firebaseAuth";
 
-export default {
+const authConfig = {
   providers: FIREBASE_AUTH_PROJECT_ID
     ? [
         {
@@ -10,3 +10,6 @@ export default {
       ]
     : [],
 };
+
+export default authConfig;
+
