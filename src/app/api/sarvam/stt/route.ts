@@ -31,7 +31,9 @@ export async function POST(request: Request) {
     audio instanceof File && audio.name
       ? audio.name
       : `speech.${audio.type.includes("wav") ? "wav" : audio.type.includes("mp4") ? "mp4" : "webm"}`;
+  outbound.set("file", audio, filename);
   const model = process.env.SARVAM_STT_MODEL || "saaras:v3";
+
   outbound.set("model", model);
   outbound.set("mode", "codemix");
   if (languageCode) {

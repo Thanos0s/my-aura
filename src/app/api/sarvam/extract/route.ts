@@ -39,7 +39,9 @@ export async function POST(request: Request) {
     });
   }
 
+  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content ?? "{}";
+
   let extracted: Record<string, string> = {};
   try {
     const clean = content.replace(/```json\s*|```/g, "").trim();

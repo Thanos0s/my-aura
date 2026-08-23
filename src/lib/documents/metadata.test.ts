@@ -71,6 +71,15 @@ describe("document extract metadata", () => {
     expect(meta.structuredFields.possibleLabs[2]).toContain("TSH");
     expect(meta.reviewRequired).toBe(false);
   });
+
+  it("correctly evaluates whether an extract blocks doctor approval", () => {
+    expect(extractBlocksApprove({ reviewStatus: "pending", confidence: 0.85 })).toBe(false);
+    expect(extractBlocksApprove({ reviewStatus: "pending", confidence: 0.45 })).toBe(true);
+    expect(extractBlocksApprove({ reviewStatus: "failed", confidence: 0 })).toBe(true);
+    expect(extractBlocksApprove({ reviewStatus: "confirmed", confidence: 0.45 })).toBe(false);
+    expect(extractBlocksApprove({ reviewStatus: "corrected", confidence: 0.45 })).toBe(false);
+  });
 });
+
 
 
