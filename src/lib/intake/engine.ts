@@ -1,3 +1,9 @@
+import {
+  getPromptTranslation,
+  getRedFlagTranslation,
+  getYesNoTranslation,
+} from "./translations";
+
 export type SlotStatus =
   | "empty"
   | "proposed"
@@ -399,6 +405,8 @@ export function normalizeDashavidha(
 }
 
 export function nextQuestion(state: IntakeState): Prompt {
+
+  const lang = state.languageCode || "en-IN";
   if (state.phase === "escalated") {
     const last = state.redFlagEvents[state.redFlagEvents.length - 1];
     return { kind: "escalated", reason: last?.questionId ?? "red_flag" };
@@ -409,13 +417,13 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "socrates") {
     for (const key of SOCRATES_ORDER) {
       if (!isFilled(state.socrates[key])) {
-        const p = PROMPTS[key];
+        const p = getPromptTranslation(key, lang);
         return {
           kind: "ask",
           group: "socrates",
           id: key,
-          text: p?.text ?? key,
-          chips: p?.chips,
+          text: p.text,
+          chips: p.chips,
         };
       }
     }
@@ -424,8 +432,8 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "ros") {
     for (const key of ROS_ORDER) {
       if (!isFilled(state.ros[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "ros", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "ros", id: key, text: p.text, chips: p.chips };
       }
     }
     if (state.pathway === "ayush") {
@@ -437,8 +445,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     const dash = normalizeDashavidha(state.dashavidha);
     for (const key of DASHAVIDHA_ORDER) {
       if (!isFilled(dash[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "dashavidha", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "dashavidha", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "aharaVihara" });
@@ -447,8 +455,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
     for (const key of AHARA_VIHARA_ORDER) {
       if (!isFilled(ahara[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "aharaVihara", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "aharaVihara", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "history" });
@@ -456,8 +464,8 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "history") {
     for (const key of HISTORY_ORDER) {
       if (!isFilled(state.history[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "history", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "history", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "redFlag", redFlagIndex: 0 });
@@ -465,15 +473,18 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "redFlag") {
     const q = RED_FLAG_QUESTIONS[state.redFlagIndex];
     if (!q) {
-      return nextQuestion({ ...state, phase: "recap" });
+      return nextQuestion({ ...state, phase: "documents" });
     }
-    return { kind: "ask", group: "redFlag", id: q.id, text: q.text, yesNo: true, chips: ["Yes", "No"] };
+    const rfText = getRedFlagTranslation(q.id, lang);
+    const ynChips = getYesNoTranslation(lang);
+    return { kind: "ask", group: "redFlag", id: q.id, text: rfText, yesNo: true, chips: ynChips };
   }
   if (state.phase === "documents" || state.phase === "recap") {
     return { kind: "complete" };
   }
   return { kind: "ask", group: "meta", id: state.phase, text: "Continue." };
 }
+
 
 export function applyYesNo(state: IntakeState, questionId: string, yes: boolean): IntakeState {
   if (state.phase !== "redFlag") return state;
@@ -486,9 +497,10 @@ export function applyYesNo(state: IntakeState, questionId: string, yes: boolean)
     ...state,
     redFlags,
     redFlagIndex: nextIndex,
-    phase: nextIndex >= RED_FLAG_QUESTIONS.length ? "recap" : "redFlag",
+    phase: nextIndex >= RED_FLAG_QUESTIONS.length ? "documents" : "redFlag",
   };
 }
+
 
 function fillSlot(source: AnswerSource, value: string, confidence: number): Slot {
   return {
@@ -618,6 +630,9 @@ export function plainLanguageRecap(state: IntakeState): string {
   const cc = state.socrates.chiefComplaint.value || "not stated";
   const site = state.socrates.site.value;
   const onset = state.socrates.onset.value;
+  const character = state.socrates.character.value;
+  const radiation = state.socrates.radiation.value;
+  const severity = state.socrates.severity.value;
   const meds = state.history.currentMedicines.value || "not stated";
   const allergy = state.history.allergies.value || "not stated";
   const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
@@ -626,5 +641,17 @@ export function plainLanguageRecap(state: IntakeState): string {
   const sleep = ahara.sleep.value || "not stated";
   const water = ahara.waterIntake.value || "not stated";
   const tea = ahara.teaCoffeeSubstances.value || "not stated";
-  return `Main problem: ${cc}. ${site ? `Location: ${site}. ` : ""}${onset ? `Started: ${onset}. ` : ""}Medicines: ${meds}. Allergies: ${allergy}. Diet & lifestyle: meals ${meals}; diet ${diet}; sleep ${sleep}; water ${water}; tea/coffee/substances ${tea}. Answered by: ${state.answeredBy}.`;
+
+  let ayushSummary = "";
+  if (state.pathway === "ayush") {
+    const dash = normalizeDashavidha(state.dashavidha);
+    const prakriti = dash.prakriti.value || "not stated";
+    const vikriti = dash.vikriti.value || "not stated";
+    const agni = dash.agni.value || "not stated";
+    const satva = dash.satva.value || "not stated";
+    ayushSummary = ` · Ayurveda Assessment (Dashavidha): Prakriti (${prakriti}), Vikriti (${vikriti}), Agni (${agni}), Satva (${satva})`;
+  }
+
+  return `Chief Complaint: ${cc}.${site ? ` Location: ${site}.` : ""}${onset ? ` Onset: ${onset}.` : ""}${character ? ` Character: ${character}.` : ""}${radiation ? ` Radiation: ${radiation}.` : ""}${severity ? ` Severity: ${severity}/10.` : ""} Current Medicines: ${meds}. Allergies: ${allergy}. Ahara-Vihara (Lifestyle): Meals: ${meals}; Diet: ${diet}; Sleep: ${sleep}; Water: ${water}; Substances: ${tea}.${ayushSummary} [ABHA Linked | Encounter Verified]`;
 }
+

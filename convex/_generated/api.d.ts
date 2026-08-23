@@ -14,6 +14,7 @@ import type * as clinical from "../clinical.js";
 import type * as diet from "../diet.js";
 import type * as documents from "../documents.js";
 import type * as firebaseAuth from "../firebaseAuth.js";
+import type * as foods from "../foods.js";
 import type * as lib_hash from "../lib/hash.js";
 import type * as lib_pin from "../lib/pin.js";
 import type * as lib_rbac from "../lib/rbac.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   diet: typeof diet;
   documents: typeof documents;
   firebaseAuth: typeof firebaseAuth;
+  foods: typeof foods;
   "lib/hash": typeof lib_hash;
   "lib/pin": typeof lib_pin;
   "lib/rbac": typeof lib_rbac;
