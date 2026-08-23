@@ -1,19 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  applyExtraction,
   applySlotAnswer,
   applyYesNo,
   canCompleteIntake,
+
   createInitialState,
   nextQuestion,
   plainLanguageRecap,
   DASHAVIDHA_FACTORS,
+  DASHAVIDHA_ORDER,
+  HISTORY_ORDER,
+  RED_FLAG_QUESTIONS,
+  ROS_ORDER,
+  SOCRATES_ORDER,
+  AHARA_VIHARA_ORDER,
   isFilled,
+  normalizeDashavidha,
   type IntakeState,
 } from "@/lib/intake/engine";
+import {
+  getPromptTranslation,
+  getRedFlagTranslation,
+} from "@/lib/intake/translations";
 import { detectSarvamLanguageCode, SARVAM_LANGUAGES } from "@/lib/sarvam/languages";
 
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
@@ -90,8 +101,8 @@ export function KioskWizard({
   const [abhaId, setAbhaId] = useState("");
   const [visitId, setVisitId] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
-  const [textBus, setTextBus] = useState("");
   const [busy, setBusy] = useState(false);
+
   const [message, setMessage] = useState("");
   const [ocrNote, setOcrNote] = useState("");
   const [extractLit, setExtractLit] = useState(false);
@@ -99,7 +110,13 @@ export function KioskWizard({
   const [docStage, setDocStage] = useState<"idle" | "physical" | "ocr" | "meta" | "attach" | "review">("idle");
   const [localDocs, setLocalDocs] = useState<LocalDoc[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceChatMode, setVoiceChatMode] = useState(true);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Arrive sub-step (login, language, consent, pathway)
   const [arriveSubStep, setArriveSubStep] = useState<"id" | "language" | "consent" | "pathway">("id");
@@ -147,6 +164,91 @@ export function KioskWizard({
     return nextQuestion(state);
   }, [state]);
 
+  // Derived Conversational History for Point-wise Chatbot UI
+  const conversationHistory = useMemo(() => {
+    const list: Array<{ id: string; question: string; answer: string }> = [];
+    const lang = state.languageCode || "en-IN";
+
+    for (const key of SOCRATES_ORDER) {
+      const slot = state.socrates[key];
+      if (isFilled(slot)) {
+        list.push({
+          id: `socrates-${key}`,
+          question: getPromptTranslation(key, lang).text,
+          answer: slot.value,
+        });
+      }
+    }
+
+    for (const key of ROS_ORDER) {
+      const slot = state.ros[key];
+      if (isFilled(slot)) {
+        list.push({
+          id: `ros-${key}`,
+          question: getPromptTranslation(key, lang).text,
+          answer: slot.value,
+        });
+      }
+    }
+
+    if (state.pathway === "ayush") {
+      const dash = normalizeDashavidha(state.dashavidha);
+      for (const key of DASHAVIDHA_ORDER) {
+        const slot = dash[key];
+        if (isFilled(slot)) {
+          list.push({
+            id: `dash-${key}`,
+            question: getPromptTranslation(key, lang).text,
+            answer: slot.value,
+          });
+        }
+      }
+    }
+
+    if (state.aharaVihara) {
+      for (const key of AHARA_VIHARA_ORDER) {
+        const slot = state.aharaVihara[key];
+        if (slot && isFilled(slot)) {
+          list.push({
+            id: `ahara-${key}`,
+            question: getPromptTranslation(key, lang).text,
+            answer: slot.value,
+          });
+        }
+      }
+    }
+
+    for (const key of HISTORY_ORDER) {
+      const slot = state.history[key];
+      if (isFilled(slot)) {
+        list.push({
+          id: `history-${key}`,
+          question: getPromptTranslation(key, lang).text,
+          answer: slot.value,
+        });
+      }
+    }
+
+    for (let i = 0; i < state.redFlagIndex; i++) {
+      const q = RED_FLAG_QUESTIONS[i];
+      if (q && state.redFlags[q.id] !== null) {
+        list.push({
+          id: `rf-${q.id}`,
+          question: getRedFlagTranslation(q.id, lang),
+          answer: state.redFlags[q.id]
+            ? lang.startsWith("hi")
+              ? "हाँ"
+              : "Yes"
+            : lang.startsWith("hi")
+            ? "नहीं"
+            : "No",
+        });
+      }
+    }
+
+    return list;
+  }, [state]);
+
   const clinical = !["consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
 
   async function persist(next: IntakeState, status?: "intake" | "awaiting_patient_confirm" | "escalated") {
@@ -159,11 +261,59 @@ export function KioskWizard({
     });
   }
 
+  function stopSpeaking() {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    setIsSpeaking(false);
+  }
+
+  async function speak(text: string, onDone?: () => void) {
+    stopSpeaking();
+    if (!text || !text.trim()) {
+      if (onDone) onDone();
+      return;
+    }
+    setIsSpeaking(true);
+    try {
+      const res = await fetch("/api/sarvam/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, languageCode: state.languageCode || "en-IN" }),
+      });
+      const data = (await res.json()) as { audioBase64?: string | null };
+      if (data.audioBase64) {
+        const audio = new Audio(`data:audio/wav;base64,${data.audioBase64}`);
+        currentAudioRef.current = audio;
+        audio.onended = () => {
+          setIsSpeaking(false);
+          currentAudioRef.current = null;
+          if (onDone) onDone();
+        };
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          currentAudioRef.current = null;
+          if (onDone) onDone();
+        };
+        await audio.play();
+      } else {
+        setIsSpeaking(false);
+        if (onDone) onDone();
+      }
+    } catch {
+      setIsSpeaking(false);
+      if (onDone) onDone();
+    }
+  }
+
   async function beginClinical() {
     const next: IntakeState = { ...state, phase: "socrates" };
     setState(next);
+    let newVisitId = visitId;
     if (adapters) {
-      const id = await adapters.startVisit({
+      newVisitId = await adapters.startVisit({
         displayName,
         abhaId: abhaId || undefined,
         languageCode: state.languageCode,
@@ -177,108 +327,40 @@ export function KioskWizard({
         retainAfterEncounter: state.consent.retainAfterEncounter,
         sessionUserId: boundProfile?.sessionUserId,
       });
-      setVisitId(id);
+      setVisitId(newVisitId);
     }
-    // Speak first question
+    // Speak first question in selected language, then auto-listen if continuous voice mode is on
     const q1 = nextQuestion(next);
     if (q1.kind === "ask") {
-      void speak(q1.text);
+      void speak(q1.text, () => {
+        if (voiceChatMode) {
+          setTimeout(() => {
+            void recordAndTranscribe();
+          }, 300);
+        }
+      });
     }
   }
 
-  async function speak(text: string) {
-    try {
-      const res = await fetch("/api/sarvam/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, languageCode: state.languageCode || "en-IN" }),
-      });
-      const data = (await res.json()) as { audioBase64?: string | null };
-      if (data.audioBase64) {
-        const audio = new Audio(`data:audio/wav;base64,${data.audioBase64}`);
-        await audio.play();
-      }
-    } catch {
-      /* typed mode is enough */
+  function stopRecordingEarly() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
     }
   }
 
-  async function recordAndTranscribe() {
-    setBusy(true);
-    setIsRecording(true);
-    setRecordingSeconds(0);
-    setMessage("");
-
-    const timer = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.start();
-      await new Promise((r) => setTimeout(r, 4500));
-      recorder.stop();
-      await new Promise((r) => {
-        recorder.onstop = () => r(null);
-      });
-      stream.getTracks().forEach((t) => t.stop());
-      clearInterval(timer);
-      setIsRecording(false);
-
-      const blob = new Blob(chunks, { type: "audio/webm" });
-      const form = new FormData();
-      form.set("audio", blob, "speech.webm");
-      form.set("languageCode", state.languageCode || "en-IN");
-      const stt = await fetch("/api/sarvam/stt", { method: "POST", body: form });
-      const sttJson = (await stt.json()) as { text?: string; error?: string; languageCode?: string };
-
-      if (!sttJson.text) {
-        setState((s) => ({ ...s, offlineMode: true }));
-        setMessage(sttJson.error ?? "Voice input received. Please confirm or use quick tap chips.");
-        return;
-      }
-
-      const sttLanguage = sttJson.languageCode
-        ? detectSarvamLanguageCode(sttJson.languageCode)
-        : state.languageCode;
-      setTyped(sttJson.text);
-      setTextBus(sttJson.text);
-
-      const extracted = await fetch("/api/sarvam/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: sttJson.text }),
-      });
-      const ex = (await extracted.json()) as { extracted?: Record<string, string> };
-
-      if (ex.extracted) {
-        setExtractLit(true);
-        const next = { ...applyExtraction(state, ex.extracted), languageCode: sttLanguage };
-        setState(next);
-        await persist(next);
-      } else if (sttLanguage !== state.languageCode) {
-        setState((s) => ({ ...s, languageCode: sttLanguage }));
-      }
-    } catch {
-      clearInterval(timer);
-      setIsRecording(false);
-      setState((s) => ({ ...s, offlineMode: true }));
-      setMessage("Microphone not available. You can tap the quick chips or type freely.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitTyped() {
+  async function handleAnswerSubmit(value: string) {
     if (!prompt || prompt.kind !== "ask") return;
-    const value = typed.trim();
-    if (!value) return;
-    setTextBus(value);
+    const val = value.trim();
+    if (!val) return;
     let next = state;
+    setExtractLit(true);
+
+
 
     if (prompt.yesNo) {
-      next = applyYesNo(state, prompt.id, /^y/i.test(value) || value === "Yes");
+      const isYes =
+        /^y|हाँ|ha|yes|haan|bilkul/i.test(val) || val === "Yes" || val === "हाँ";
+      next = applyYesNo(state, prompt.id, isYes);
     } else if (
       prompt.group === "socrates" ||
       prompt.group === "history" ||
@@ -290,7 +372,7 @@ export function KioskWizard({
         state,
         prompt.group,
         prompt.id,
-        value,
+        val,
         state.answeredBy === "attendant" ? "attendant" : "patient"
       );
     }
@@ -315,10 +397,112 @@ export function KioskWizard({
     }
 
     await persist(next);
+
     if (follow.kind === "ask") {
-      void speak(follow.text);
+      // Continuous Voice Chatbot: Speak the next question in Hindi/chosen language, then auto-listen
+      void speak(follow.text, () => {
+        if (voiceChatMode) {
+          setTimeout(() => {
+            void recordAndTranscribe();
+          }, 350);
+        }
+      });
     }
   }
+
+  async function recordAndTranscribe() {
+    if (isRecording || isSpeaking) return;
+    stopSpeaking();
+    setBusy(true);
+    setIsRecording(true);
+    setRecordingSeconds(0);
+    setMessage("");
+
+    const timer = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      const stoppedPromise = new Promise((resolve) => {
+        recorder.onstop = () => resolve(null);
+      });
+
+      recorder.start();
+
+      // Auto-stop after 5.5s if not stopped earlier by user
+      const timeoutId = setTimeout(() => {
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, 5500);
+
+      await stoppedPromise;
+      clearTimeout(timeoutId);
+      stream.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      clearInterval(timer);
+      setIsRecording(false);
+
+      if (chunks.length === 0) {
+        setBusy(false);
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (blob.size < 200) {
+        setBusy(false);
+        return;
+      }
+
+      const form = new FormData();
+      form.set("audio", blob, "speech.webm");
+      form.set("languageCode", state.languageCode || "en-IN");
+      const stt = await fetch("/api/sarvam/stt", { method: "POST", body: form });
+      const sttJson = (await stt.json()) as { text?: string; error?: string; languageCode?: string };
+
+      if (!sttJson.text || !sttJson.text.trim()) {
+        setMessage(
+          sttJson.error ??
+            (state.languageCode.startsWith("hi")
+              ? "आवाज़ नहीं सुनी गई। कृपया फिर से बोलें या नीचे दिए गए विकल्पों पर टैप करें।"
+              : "No speech recognized. Please speak again or tap a quick chip below.")
+        );
+        return;
+      }
+
+      const recognized = sttJson.text.trim();
+      setTyped(recognized);
+
+      // Automatically commit the spoken answer to continue conversational chatbot flow
+      await handleAnswerSubmit(recognized);
+
+    } catch {
+      clearInterval(timer);
+      setIsRecording(false);
+      setState((s) => ({ ...s, offlineMode: true }));
+      setMessage(
+        state.languageCode.startsWith("hi")
+          ? "माइक्रोफोन उपलब्ध नहीं है। आप नीचे दिए गए विकल्पों पर टैप कर सकते हैं।"
+          : "Microphone not available. You can tap the quick chips or type freely."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitTyped() {
+    if (!typed.trim()) return;
+    await handleAnswerSubmit(typed.trim());
+  }
+
 
   async function onUpload(file: File) {
     setBusy(true);
@@ -632,12 +816,19 @@ export function KioskWizard({
                           ? "bg-[#1b343f] text-white border-[#1b343f] shadow-xs"
                           : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
                       }`}
-                      onClick={() => setState({ ...state, languageCode: lang.code })}
+                      onClick={() => {
+                        setState({ ...state, languageCode: lang.code });
+                        const greeting = lang.code.startsWith("hi")
+                          ? "नमस्ते! माय-ऑरा स्वास्थ्य सहायक में आपका स्वागत है।"
+                          : "Hello! Welcome to My-Aura health assistant.";
+                        void speak(greeting);
+                      }}
                     >
                       <p className="font-bold text-xs">{lang.name}</p>
                       <p className="font-mono text-[10px] text-slate-400 mt-0.5">{lang.code}</p>
                     </button>
                   ))}
+
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
@@ -800,49 +991,55 @@ export function KioskWizard({
         ) : null}
 
         {/* ══════════════════════════════════════════════════════════════════════
-            STEP 2: TALK TO THE AI
+            STEP 2: TALK TO THE AI (CONTINUOUS VOICE CHATBOT & INTERACTIVE CONVERSATION)
             SOCRATES Sequence · Ayurveda Dashavidha (if AYUSH) · Emergency Safety
            ══════════════════════════════════════════════════════════════════════ */}
         {prompt && prompt.kind === "ask" && state.phase !== "documents" && state.phase !== "complete" && state.phase !== "recap" ? (
-          <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <section className="rounded-3xl bg-white p-5 md:p-6 shadow-sm border border-slate-100/90 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
-                <span className="font-mono text-[10px] font-bold text-sky-800 uppercase tracking-wider bg-sky-50 px-2 py-0.5 rounded-full">
-                  Step 02 · AI Case Taking · {prompt.group.toUpperCase()}
+                <span className="font-mono text-[10px] font-bold text-sky-800 uppercase tracking-wider bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
+                  Step 02 · Voice Chatbot · {prompt.group.toUpperCase()}
                 </span>
-                <p className="text-xs text-slate-500 mt-1">
-                  Speak into your microphone or tap the quick answer chips below.
-                </p>
+                <h2 className="text-xl font-bold text-slate-900 mt-1">
+                  {state.languageCode.startsWith("hi") ? "एआई स्वास्थ्य सहायक से बात करें" : "Speak with Aura Health AI"}
+                </h2>
               </div>
 
-              {state.pathway === "ayush" && (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                  🌿 Ayurvedic OPD Active
-                </span>
-              )}
-            </div>
-
-            {/* AI Speech & Question Display */}
-            <div className="rounded-2xl bg-gradient-to-r from-sky-50/80 to-indigo-50/50 p-4 border border-sky-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🤖</span>
-                  <span className="font-bold text-xs text-slate-900">Aura Health Clinical AI</span>
-                </div>
+              <div className="flex items-center gap-2">
+                {state.pathway === "ayush" && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    🌿 Ayurvedic OPD
+                  </span>
+                )}
                 <button
                   type="button"
-                  className="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1"
-                  onClick={() => void speak(prompt.text)}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    voiceChatMode
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  onClick={() => {
+                    const nextMode = !voiceChatMode;
+                    setVoiceChatMode(nextMode);
+                    if (nextMode) {
+                      void speak(prompt.text, () => {
+                        setTimeout(() => void recordAndTranscribe(), 300);
+                      });
+                    } else {
+                      stopSpeaking();
+                      stopRecordingEarly();
+                    }
+                  }}
                 >
-                  🔊 Listen
+                  <span>{voiceChatMode ? "🎙️ Voice Bot: ON" : "⌨️ Touch Mode"}</span>
                 </button>
               </div>
-              <h2 className="text-lg md:text-xl font-bold text-slate-900 leading-snug">{prompt.text}</h2>
             </div>
 
             {/* Dashavidha Indicator (If running Ayurvedic assessment) */}
             {prompt.group === "dashavidha" && (
-              <div className="rounded-2xl bg-emerald-50/70 p-3.5 border border-emerald-200/80 space-y-2">
+              <div className="rounded-2xl bg-emerald-50/70 p-3 border border-emerald-200/80 space-y-1.5">
                 <p className="font-mono text-[10px] font-bold text-emerald-950 uppercase tracking-wider">
                   🌿 Dashavidha Pariksha Factor Checklist (10 Ayurvedic Pillars):
                 </p>
@@ -854,7 +1051,7 @@ export function KioskWizard({
                         prompt.id === factor.key
                           ? "bg-emerald-700 text-white border-emerald-800 font-bold"
                           : isFilled(state.dashavidha[factor.key])
-                          ? "bg-white text-emerald-900 border-emerald-200"
+                          ? "bg-white text-emerald-900 border-emerald-200 font-semibold"
                           : "bg-white/60 text-slate-400 border-slate-100"
                       }`}
                     >
@@ -865,59 +1062,122 @@ export function KioskWizard({
               </div>
             )}
 
-            {/* Voice vs Touchscreen Inputs */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                disabled={busy}
-                type="button"
-                className={`p-4 rounded-2xl border text-left transition-all ${
-                  isRecording
-                    ? "bg-rose-50 border-rose-300 text-rose-900 animate-pulse"
-                    : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800"
-                }`}
-                onClick={() => void recordAndTranscribe()}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xl">{isRecording ? "🔴" : "🎙️"}</span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Voice Input
-                  </span>
-                </div>
-                <p className="font-bold text-sm mt-1">
-                  {isRecording ? `Recording... (${recordingSeconds}s)` : "Tap to Speak Answer"}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Powered by Sarvam Multilingual Speech Recognition
-                </p>
-              </button>
-
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 text-slate-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-xl">💬</span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Touch &amp; Type
-                  </span>
-                </div>
-                <p className="font-bold text-sm mt-1">Touchscreen Chips</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Tap quick chips below or type detailed observations</p>
+            {/* ─── Conversational Point-Wise Chatbot Thread ─────────────────── */}
+            <div className="rounded-3xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-3 max-h-[420px] overflow-y-auto">
+              <div className="text-center">
+                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-widest bg-slate-200/70 px-2.5 py-0.5 rounded-full">
+                  Chatbot Consultation Thread · {state.languageCode}
+                </span>
               </div>
+
+              {/* Past Exchanges in Order */}
+              {conversationHistory.map((item, idx) => (
+                <div key={item.id || idx} className="space-y-2">
+                  {/* AI Question on Left */}
+                  <div className="flex items-start gap-2.5 max-w-xl">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sm shadow-xs border border-sky-200">
+                      🤖
+                    </div>
+                    <div className="rounded-2xl bg-white p-3 shadow-xs border border-slate-200 text-xs text-slate-800">
+                      <p className="font-semibold text-slate-900">{item.question}</p>
+                    </div>
+                  </div>
+
+                  {/* Patient Answer on Right */}
+                  <div className="flex items-start justify-end gap-2.5 max-w-xl ml-auto">
+                    <div className="rounded-2xl bg-[#1b343f] p-3 shadow-xs text-xs text-white">
+                      <p className="font-medium">{item.answer}</p>
+                    </div>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xs font-bold text-emerald-900 shadow-xs border border-emerald-200">
+                      👤
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* ── Active AI Question Bubble ──────────────────────────────── */}
+              <div className="flex items-start gap-2.5 max-w-2xl pt-1">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+                  🤖
+                </div>
+                <div className="flex-1 rounded-2xl bg-white p-4 shadow-sm border border-sky-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-slate-900">Aura Clinical AI</span>
+                      {isSpeaking ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-[10px] text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 animate-pulse">
+                          🔊 {state.languageCode.startsWith("hi") ? "AI बोल रहा है..." : "AI speaking..."}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {state.languageCode}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs text-sky-700 hover:text-sky-950 font-bold flex items-center gap-1 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-xl transition-colors"
+                      onClick={() => void speak(prompt.text)}
+                    >
+                      🔊 {state.languageCode.startsWith("hi") ? "दोबारा सुनें" : "Listen Again"}
+                    </button>
+                  </div>
+
+                  <h3 className="text-base md:text-lg font-bold text-slate-900 leading-snug">
+                    {prompt.text}
+                  </h3>
+
+                  {/* Audio visualizer bar when speaking */}
+                  {isSpeaking && (
+                    <div className="flex items-center gap-1 py-1">
+                      <span className="h-2.5 w-1 bg-sky-500 rounded-full animate-bounce" />
+                      <span className="h-4 w-1 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.15s]" />
+                      <span className="h-3 w-1 bg-sky-600 rounded-full animate-bounce [animation-delay:0.3s]" />
+                      <span className="h-5 w-1 bg-indigo-600 rounded-full animate-bounce [animation-delay:0.45s]" />
+                      <span className="text-[11px] text-sky-800 font-mono font-medium ml-1">
+                        {state.languageCode.startsWith("hi") ? "सुनें और उत्तर दें..." : "Listening for answer..."}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Active Listening / User Speaking Status Bubble ──────────── */}
+              {isRecording && (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-3 w-3 rounded-full bg-rose-600" />
+                    <span className="text-xs font-bold">
+                      {state.languageCode.startsWith("hi")
+                        ? `🎙️ आपकी आवाज़ सुनी जा रही है (${recordingSeconds}s)... बोलिए`
+                        : `🎙️ Listening to you (${recordingSeconds}s)... Speak now`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 text-xs font-bold shadow-xs transition-colors"
+                    onClick={() => stopRecordingEarly()}
+                  >
+                    ✓ {state.languageCode.startsWith("hi") ? "पूरा हुआ (भेजें)" : "Done (Send)"}
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Quick Answer Chips */}
+            {/* Quick Answer Chips (One-Tap Instant Answers) */}
             {prompt.chips && prompt.chips.length > 0 && (
               <div className="space-y-1.5">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Quick Answer Chips:
+                  {state.languageCode.startsWith("hi") ? "त्वरित उत्तर विकल्प (टैप करें):" : "Quick Answer Chips (Tap to answer):"}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {prompt.chips.map((chip) => (
                     <button
                       key={chip}
                       type="button"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:border-sky-400 hover:bg-sky-50/50 shadow-2xs transition-all"
+                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:border-sky-500 hover:bg-sky-50 shadow-2xs hover:shadow-xs transition-all active:scale-95"
                       onClick={() => {
-                        setTyped(chip);
-                        setTextBus(chip);
+                        void handleAnswerSubmit(chip);
                       }}
                     >
                       {chip}
@@ -927,35 +1187,69 @@ export function KioskWizard({
               </div>
             )}
 
-            {/* Textarea Input & Speech Bus Live Indicator */}
-            <div className="space-y-1.5">
-              <textarea
-                className="tl-input text-xs"
-                rows={2}
-                placeholder="Type or speak your answer here..."
-                value={typed}
-                onChange={(e) => {
-                  setTyped(e.target.value);
-                  setTextBus(e.target.value);
+            {/* Voice Mic Trigger & Manual Type Input */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+              <button
+                disabled={busy || isSpeaking}
+                type="button"
+                className={`p-3 rounded-2xl border font-bold text-xs flex items-center justify-center gap-2 transition-all sm:w-56 shrink-0 ${
+                  isRecording
+                    ? "bg-rose-600 text-white border-rose-600 animate-pulse shadow-md"
+                    : "bg-[#1b343f] text-white border-[#1b343f] hover:bg-[#274d5d] shadow-xs"
+                }`}
+                onClick={() => {
+                  if (isRecording) {
+                    stopRecordingEarly();
+                  } else {
+                    void recordAndTranscribe();
+                  }
                 }}
-              />
-              {textBus && (
-                <p className="font-mono text-[10px] text-slate-400">
-                  Input buffer: <span className="text-slate-700 font-semibold">{textBus}</span>
-                </p>
-              )}
+              >
+                <span className="text-base">{isRecording ? "⏹️" : "🎙️"}</span>
+                <span>
+                  {isRecording
+                    ? state.languageCode.startsWith("hi")
+                      ? `रिकॉर्डिंग बंद करें (${recordingSeconds}s)`
+                      : `Stop Recording (${recordingSeconds}s)`
+                    : state.languageCode.startsWith("hi")
+                    ? "बोलकर उत्तर दें (Mic)"
+                    : "Tap to Speak Answer"}
+                </span>
+              </button>
+
+              <div className="flex-1 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  className="tl-input text-xs py-2.5 flex-1"
+                  placeholder={
+                    state.languageCode.startsWith("hi")
+                      ? "या यहाँ अपना उत्तर टाइप करें..."
+                      : "Or type your answer here..."
+                  }
+                  value={typed}
+                  onChange={(e) => {
+                    setTyped(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+
+                    if (e.key === "Enter" && typed.trim()) {
+                      void submitTyped();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!typed.trim()}
+                  className="rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white px-4 py-2.5 text-xs font-bold shadow-xs transition-colors shrink-0"
+                  onClick={() => void submitTyped()}
+                >
+                  {state.languageCode.startsWith("hi") ? "भेजें →" : "Send →"}
+                </button>
+              </div>
             </div>
-
-
-            <button
-              type="button"
-              className="btn-pulse w-full py-2.5 text-xs font-bold"
-              onClick={() => void submitTyped()}
-            >
-              Save Answer &amp; Continue →
-            </button>
           </section>
         ) : null}
+
 
         {/* Emergency Staff Alert Screen (Red Flag Escalation) */}
         {state.phase === "escalated" && (

@@ -1,3 +1,9 @@
+import {
+  getPromptTranslation,
+  getRedFlagTranslation,
+  getYesNoTranslation,
+} from "./translations";
+
 export type SlotStatus =
   | "empty"
   | "proposed"
@@ -399,6 +405,8 @@ export function normalizeDashavidha(
 }
 
 export function nextQuestion(state: IntakeState): Prompt {
+
+  const lang = state.languageCode || "en-IN";
   if (state.phase === "escalated") {
     const last = state.redFlagEvents[state.redFlagEvents.length - 1];
     return { kind: "escalated", reason: last?.questionId ?? "red_flag" };
@@ -409,13 +417,13 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "socrates") {
     for (const key of SOCRATES_ORDER) {
       if (!isFilled(state.socrates[key])) {
-        const p = PROMPTS[key];
+        const p = getPromptTranslation(key, lang);
         return {
           kind: "ask",
           group: "socrates",
           id: key,
-          text: p?.text ?? key,
-          chips: p?.chips,
+          text: p.text,
+          chips: p.chips,
         };
       }
     }
@@ -424,8 +432,8 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "ros") {
     for (const key of ROS_ORDER) {
       if (!isFilled(state.ros[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "ros", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "ros", id: key, text: p.text, chips: p.chips };
       }
     }
     if (state.pathway === "ayush") {
@@ -437,8 +445,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     const dash = normalizeDashavidha(state.dashavidha);
     for (const key of DASHAVIDHA_ORDER) {
       if (!isFilled(dash[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "dashavidha", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "dashavidha", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "aharaVihara" });
@@ -447,8 +455,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
     for (const key of AHARA_VIHARA_ORDER) {
       if (!isFilled(ahara[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "aharaVihara", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "aharaVihara", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "history" });
@@ -456,8 +464,8 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "history") {
     for (const key of HISTORY_ORDER) {
       if (!isFilled(state.history[key])) {
-        const p = PROMPTS[key];
-        return { kind: "ask", group: "history", id: key, text: p?.text ?? key, chips: p?.chips };
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "history", id: key, text: p.text, chips: p.chips };
       }
     }
     return nextQuestion({ ...state, phase: "redFlag", redFlagIndex: 0 });
@@ -467,13 +475,16 @@ export function nextQuestion(state: IntakeState): Prompt {
     if (!q) {
       return nextQuestion({ ...state, phase: "documents" });
     }
-    return { kind: "ask", group: "redFlag", id: q.id, text: q.text, yesNo: true, chips: ["Yes", "No"] };
+    const rfText = getRedFlagTranslation(q.id, lang);
+    const ynChips = getYesNoTranslation(lang);
+    return { kind: "ask", group: "redFlag", id: q.id, text: rfText, yesNo: true, chips: ynChips };
   }
   if (state.phase === "documents" || state.phase === "recap") {
     return { kind: "complete" };
   }
   return { kind: "ask", group: "meta", id: state.phase, text: "Continue." };
 }
+
 
 export function applyYesNo(state: IntakeState, questionId: string, yes: boolean): IntakeState {
   if (state.phase !== "redFlag") return state;
