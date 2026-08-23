@@ -10,15 +10,10 @@ import {
   nextQuestion,
   plainLanguageRecap,
   DASHAVIDHA_FACTORS,
-  DASHAVIDHA_ORDER,
-  SOCRATES_ORDER,
-  AHARA_VIHARA_ORDER,
   isFilled,
-  normalizeDashavidha,
   QUESTION_BANK,
   type IntakeState,
 } from "@/lib/intake/engine";
-import { getPromptTranslation } from "@/lib/intake/translations";
 import { detectSarvamLanguageCode, SARVAM_LANGUAGES } from "@/lib/sarvam/languages";
 
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
@@ -160,6 +155,14 @@ export function KioskWizard({
 
   // Derived Conversational History for Point-wise Chatbot UI
   const conversationHistory = useMemo(() => {
+    if (state.chatHistory && state.chatHistory.length > 0) {
+      return state.chatHistory.map((item) => ({
+        id: item.id,
+        question: item.question,
+        answer: item.answer,
+      }));
+    }
+
     const list: Array<{ id: string; question: string; answer: string }> = [];
     const lang = state.languageCode || "en-IN";
     const isHi = lang.startsWith("hi");
@@ -187,51 +190,11 @@ export function KioskWizard({
           }
         }
       }
-    } else {
-
-      // Fallback to legacy slots if not matched
-      for (const key of SOCRATES_ORDER) {
-        if (key === "chiefComplaint") continue;
-        const slot = state.socrates[key];
-        if (isFilled(slot)) {
-          list.push({
-            id: `socrates-${key}`,
-            question: getPromptTranslation(key, lang).text,
-            answer: slot.value,
-          });
-        }
-      }
-    }
-
-    if (state.pathway === "ayush") {
-      const dash = normalizeDashavidha(state.dashavidha);
-      for (const key of DASHAVIDHA_ORDER) {
-        const slot = dash[key];
-        if (isFilled(slot)) {
-          list.push({
-            id: `dash-${key}`,
-            question: getPromptTranslation(key, lang).text,
-            answer: slot.value,
-          });
-        }
-      }
-    }
-
-    if (state.aharaVihara) {
-      for (const key of AHARA_VIHARA_ORDER) {
-        const slot = state.aharaVihara[key];
-        if (slot && isFilled(slot)) {
-          list.push({
-            id: `ahara-${key}`,
-            question: getPromptTranslation(key, lang).text,
-            answer: slot.value,
-          });
-        }
-      }
     }
 
     return list;
   }, [state]);
+
 
 
   const clinical = !["consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
@@ -363,11 +326,23 @@ export function KioskWizard({
     }
 
     const follow = nextQuestion(next);
+
+    if (follow.kind === "complete") {
+      next = { ...next, phase: "documents" };
+      setState(next);
+      setTyped("");
+      await persist(next);
+      const isHi = (next.languageCode || "en-IN").startsWith("hi");
+      const doneMsg = isHi
+        ? "धन्यवाद! आपकी समस्या का विवरण दर्ज कर लिया गया है। अब आप अगले चरण पर आगे बढ़ सकते हैं।"
+        : "Thank you! Your intake is complete. You can now proceed to the next step.";
+      void speak(doneMsg);
+      return;
+    }
+
     if (next.phase !== "escalated") {
       if (follow.kind === "ask" && follow.group !== "meta") {
         next = { ...next, phase: follow.group };
-      } else if (follow.kind === "complete") {
-        next = { ...next, phase: "documents" };
       }
     }
     setState(next);
@@ -393,6 +368,7 @@ export function KioskWizard({
         }
       });
     }
+
   }
 
   async function recordAndTranscribe() {

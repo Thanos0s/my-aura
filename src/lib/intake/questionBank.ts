@@ -788,8 +788,8 @@ export const QUESTION_BANK: ComplaintDefinition[] = [
       {
         id: "q1",
         field: "character_location",
-        en: "Can you describe what's bothering you?",
-        hi: "आपको क्या तकलीफ हो रही है, कृपया बताएं?",
+        en: "Where in the body do you feel this, and what does it feel like?",
+        hi: "यह तकलीफ शरीर में कहाँ है, और कैसी महसूस होती है?",
         chips_en: ["Discomfort in body", "Difficulty doing daily tasks", "Sleep issue", "General uneasiness"],
         chips_hi: ["शरीर में परेशानी", "रोजमर्रा के काम में दिक्कत", "नींद की समस्या", "बेचैनी महसूस होना"],
       },
