@@ -318,6 +318,43 @@ function PractitionerApp() {
                     {p.lastStatus}
                   </span>
                 </button>
+                
+                {/* Action Options when Patient is Selected */}
+                {patientFilter === p.patientId && (
+                  <div className="mt-2 space-y-1.5">
+                    <button
+                      className="w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-left text-xs font-semibold text-sky-900 hover:bg-sky-100 transition-all shadow-sm"
+                      onClick={() => {
+                        // Build Summary action
+                        setViewMode("desk");
+                        setNotice("Building unified clinical sheet for " + p.displayName);
+                      }}
+                    >
+                      <span className="block font-mono text-[10px] text-sky-600 mb-0.5">04</span>
+                      <span className="block font-semibold">Build Summary</span>
+                      <span className="block text-[10px] text-sky-700 mt-0.5">Unified clinical sheet · ABHA link</span>
+                    </button>
+                    
+                    <button
+                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-left text-xs font-semibold text-emerald-900 hover:bg-emerald-100 transition-all shadow-sm"
+                      onClick={() => {
+                        // See the Doctor action - open the first available visit for this patient
+                        const patientVisit = queue?.find(v => v.patientId === p.patientId);
+                        if (patientVisit) {
+                          setSelected(patientVisit._id);
+                          setViewMode("desk");
+                          setNotice("Opening consultation for " + p.displayName);
+                        } else {
+                          setNotice("No active visit found for " + p.displayName);
+                        }
+                      }}
+                    >
+                      <span className="block font-mono text-[10px] text-emerald-600 mb-0.5">05</span>
+                      <span className="block font-semibold">See the Doctor</span>
+                      <span className="block text-[10px] text-emerald-700 mt-0.5">OPD screen ready · Fast consultation</span>
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

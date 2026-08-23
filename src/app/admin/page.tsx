@@ -35,6 +35,11 @@ function AdminApp() {
   const issues = useQuery(api.adminOps.listIssues, sessionUserId ? { sessionUserId } : "skip");
   const audit = useQuery(api.adminOps.listAudit, sessionUserId ? { sessionUserId } : "skip");
   const appointments = useQuery(api.clinical.listAppointments, sessionUserId ? { sessionUserId } : "skip");
+  const patients = useQuery(
+    api.clinical.listPatientsForPractitioner,
+    sessionUserId ? { sessionUserId } : "skip"
+  );
+  const queue = useQuery(api.visits.listQueue);
   const setStatus = useMutation(api.clinical.setAppointmentStatus);
   const setRole = useMutation(api.auth.setUserRole);
   const saveKb = useMutation(api.adminOps.saveKnowledge);
@@ -42,6 +47,8 @@ function AdminApp() {
   const [kbTitle, setKbTitle] = useState("");
   const [kbBody, setKbBody] = useState("");
   const [kbKind, setKbKind] = useState<"article" | "prompt">("article");
+  const [selectedPatient, setSelectedPatient] = useState<Id<"patients"> | null>(null);
+  const [notice, setNotice] = useState("");
 
   if (!sessionUserId) return null;
 
@@ -175,6 +182,89 @@ function AdminApp() {
         )}
       </section>
 
+      {/* Patient Management with Build Summary & See Doctor Actions */}
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Patient Management</h2>
+          <p className="text-xs text-slate-500">Click on a patient to access clinical options</p>
+        </div>
+
+        {notice && (
+          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-mono text-amber-900">
+            {notice}
+          </div>
+        )}
+
+        <ul className="space-y-2.5">
+          {patients?.map((p) => (
+            <li key={p.patientId} className="space-y-2">
+              <button
+                className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                  selectedPatient === p.patientId
+                    ? "bg-[#1b343f] text-white shadow-sm border-[#1b343f]"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                }`}
+                onClick={() => setSelectedPatient(selectedPatient === p.patientId ? null : p.patientId)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold">{p.displayName}</p>
+                    <p
+                      className={`font-mono text-[10px] mt-0.5 ${
+                        selectedPatient === p.patientId ? "text-slate-300" : "text-slate-400"
+                      }`}
+                    >
+                      {p.lastStatus}
+                    </p>
+                  </div>
+                  <span className="text-lg">{selectedPatient === p.patientId ? "▼" : "▶"}</span>
+                </div>
+              </button>
+
+              {/* Action Options when Patient is Selected */}
+              {selectedPatient === p.patientId && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pl-4">
+                  <button
+                    className="rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-left text-xs font-semibold text-sky-900 hover:bg-sky-100 transition-all shadow-sm"
+                    onClick={() => {
+                      // Build Summary action
+                      setNotice("Building unified clinical sheet for " + p.displayName);
+                      // You can add navigation logic here
+                      window.location.href = `/practitioner?patient=${p.patientId}`;
+                    }}
+                  >
+                    <span className="block font-mono text-[10px] text-sky-600 mb-1">04</span>
+                    <span className="block font-bold text-sm">Build Summary</span>
+                    <span className="block text-[10px] text-sky-700 mt-1">
+                      Unified clinical sheet · ABHA link
+                    </span>
+                  </button>
+
+                  <button
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-left text-xs font-semibold text-emerald-900 hover:bg-emerald-100 transition-all shadow-sm"
+                    onClick={() => {
+                      // See the Doctor action - open the first available visit for this patient
+                      const patientVisit = queue?.find((v) => v.patientId === p.patientId);
+                      if (patientVisit) {
+                        setNotice("Opening consultation for " + p.displayName);
+                        window.location.href = `/practitioner?visit=${patientVisit._id}`;
+                      } else {
+                        setNotice("No active visit found for " + p.displayName);
+                      }
+                    }}
+                  >
+                    <span className="block font-mono text-[10px] text-emerald-600 mb-1">05</span>
+                    <span className="block font-bold text-sm">See the Doctor</span>
+                    <span className="block text-[10px] text-emerald-700 mt-1">
+                      OPD screen ready · Fast consultation
+                    </span>
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
         <h2 className="text-lg font-bold text-slate-900">Users, Roles & Access Control</h2>
