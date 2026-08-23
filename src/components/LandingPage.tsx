@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { useAuraSession } from "@/components/useAuraSession";
 import { HOME_FOR } from "@/lib/auth/siteFlow";
+
 import {
   CASE_SPINE,
   DASHAVIDHA_FACTORS,
