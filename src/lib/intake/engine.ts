@@ -112,6 +112,14 @@ export type ConsentMap = {
   retainAfterEncounter: boolean;
 };
 
+export type ChatExchange = {
+  id: string;
+  question: string;
+  answer: string;
+  field: string;
+  timestamp: number;
+};
+
 export type IntakeState = {
   phase: IntakePhase;
   languageCode: string;
@@ -121,6 +129,7 @@ export type IntakeState = {
   matchedComplaintId?: string;
   complaintQuestionIndex?: number;
   complaintAnswers?: Record<string, string>;
+  chatHistory?: ChatExchange[];
   redFlagIndex: number;
   redFlags: Record<string, boolean | null>;
   redFlagEvents: RedFlagEvent[];
@@ -354,6 +363,7 @@ export function createInitialState(languageCode = "en-IN"): IntakeState {
     matchedComplaintId: undefined,
     complaintQuestionIndex: 0,
     complaintAnswers: {},
+    chatHistory: [],
     redFlagIndex: 0,
     redFlags: Object.fromEntries(RED_FLAG_QUESTIONS.map((q) => [q.id, null])),
     redFlagEvents: [],
@@ -370,6 +380,115 @@ export function createInitialState(languageCode = "en-IN"): IntakeState {
 export function isFilled(slot?: Slot): boolean {
   if (!slot) return false;
   return slot.status !== "empty" && (slot.value.trim().length > 0 || slot.status === "clinician_to_assess");
+}
+
+/** Fields already answered in this consultation — used so we never re-ask. */
+export function answeredFields(state: IntakeState): Set<string> {
+  const fields = new Set<string>(Object.keys(state.complaintAnswers ?? {}));
+  for (const exchange of state.chatHistory ?? []) {
+    if (exchange.field) fields.add(exchange.field);
+  }
+  if (isFilled(state.socrates.chiefComplaint)) fields.add("chiefComplaint");
+  return fields;
+}
+
+/**
+ * Pull extra SOCRATES-style facts from a free-text utterance so one spoken
+ * answer can fill onset + medication + pattern without re-asking.
+ */
+export function harvestImpliedAnswers(
+  text: string,
+  currentField: string
+): Record<string, string> {
+  const t = text.trim();
+  if (!t) return {};
+  const out: Record<string, string> = {};
+
+  const onsetHit =
+    /(कुछ\s*दिन|कई\s*दिन|दिनों\s*से|हफ़्ते|हफ्ते|हफ्तों|आज\s*से|कल\s*से|सुबह\s*से|since\s+(a\s+)?few\s+days|for\s+\d+\s+days|yesterday|this\s+morning|last\s+week)/i.test(
+      t
+    );
+  if (onsetHit && currentField !== "onset") {
+    const m = t.match(
+      /((?:कुछ|कई)?\s*दिनों?\s*से|आज\s*से|कल\s*से|सुबह\s*से|since[^.|,]{0,40}|for\s+\d+\s+days[^.|,]{0,20})/i
+    );
+    out.onset = (m?.[1] ?? t).trim();
+  }
+
+  const noMed =
+    /(कोई\s*दवा\s*नहीं|दवा\s*नहीं\s*ली|दवाई\s*नहीं|दवाई\s*ली\s*नहीं|दवा\s*ली\s*नहीं|नहीं\s*ली\s*है\s*दवा|कोई\s*दवाई\s*ली\s*नहीं|no\s+medicine|haven'?t\s+taken\s+any\s+medicine|did\s+not\s+take\s+medicine|not\s+taken\s+any\s+(medicine|tablet))/i.test(
+      t
+    );
+  const yesMed =
+    !noMed &&
+    /(दवा\s*ली|दवाई\s*ली|गोली\s*खाई|took\s+(a\s+)?(medicine|tablet|painkiller)|paracetamol|एसिट|पैरासिटामोल)/i.test(
+      t
+    );
+  if (currentField !== "medication") {
+    if (noMed) out.medication = "कोई दवा नहीं ली / no medicine taken";
+    else if (yesMed) out.medication = t;
+  }
+
+  const often =
+    /(अक्सर|बार[-\s]*बार|लगातार|रोज|often|frequently|again\s+and\s+again|keeps\s+coming)/i.test(
+      t
+    );
+  const firstTime = /(पहली\s*बार|पहली\s*ही\s*बार|first\s+time|never\s+before)/i.test(t);
+  if (currentField !== "pattern") {
+    if (often) out.pattern = "अक्सर / बार-बार होता है";
+    else if (firstTime) out.pattern = "पहली बार";
+  }
+
+  const triggerCue =
+    /(बढ़ता|ठीक\s*होता|आराम|worse|better|after\s+food|खाने\s*के\s*बाद|rest\s+helps)/i.test(t);
+  if (triggerCue && currentField !== "trigger" && !out.trigger) {
+    out.trigger = t;
+  }
+
+  // Don't overwrite the field we are actively answering with a harvest copy.
+  delete out[currentField];
+  return out;
+}
+
+function mapComplaintFieldToState(
+  state: IntakeState,
+  field: string,
+  value: string,
+  source: AnswerSource
+): IntakeState {
+  const updatedSocrates = { ...state.socrates };
+  const updatedHistory = { ...state.history };
+  if (field === "character_location") {
+    updatedSocrates.site = fillSlot(source, value, 1);
+    updatedSocrates.character = fillSlot(source, value, 1);
+  } else if (field === "trigger") {
+    updatedSocrates.exacerbatingRelieving = fillSlot(source, value, 1);
+  } else if (field === "onset") {
+    updatedSocrates.onset = fillSlot(source, value, 1);
+  } else if (field === "medication") {
+    updatedHistory.currentMedicines = fillSlot(source, value, 1);
+  } else if (field === "pattern") {
+    updatedSocrates.timing = fillSlot(source, value, 1);
+  } else if (field === "notes") {
+    updatedSocrates.associated = fillSlot(source, value, 1);
+  } else if (field === "severity_now") {
+    updatedSocrates.severity = fillSlot(source, value, 1);
+  } else if (field in updatedSocrates) {
+    updatedSocrates[field as SocratesKey] = fillSlot(source, value, 1);
+  }
+  return { ...state, socrates: updatedSocrates, history: updatedHistory };
+}
+
+function firstUnansweredComplaintIndex(
+  complaint: ComplaintDefinition,
+  answered: Set<string>,
+  fromIndex = 0
+): number {
+  for (let i = fromIndex; i < complaint.questions.length; i += 1) {
+    const q = complaint.questions[i];
+    if (q && !answered.has(q.field)) return i;
+  }
+  return complaint.questions.length;
 }
 
 export function filledCount(slots: Record<string, Slot>): { filled: number; total: number } {
@@ -434,13 +553,13 @@ export function nextQuestion(state: IntakeState): Prompt {
     const last = state.redFlagEvents[state.redFlagEvents.length - 1];
     return { kind: "escalated", reason: last?.questionId ?? "red_flag" };
   }
-  if (state.phase === "complete") {
+  if (state.phase === "complete" || state.phase === "documents" || state.phase === "recap") {
     return { kind: "complete" };
   }
 
-  // ─── 1. SOCRATES PHASE ─────────────────────────────────────────────────────
+  // ─── 1. SOCRATES & CHIEF COMPLAINT FLOW ────────────────────────────────────
   if (state.phase === "socrates") {
-    // If not filled, ask chief complaint first
+    // If chief complaint not filled, ask the opening question
     if (!isFilled(state.socrates.chiefComplaint)) {
       const p = getPromptTranslation("chiefComplaint", lang);
       return {
@@ -454,13 +573,27 @@ export function nextQuestion(state: IntakeState): Prompt {
       };
     }
 
-    // If a specific matched complaint is in progress
-    if (state.matchedComplaintId) {
+    // Heal matched complaint from chief complaint if id was lost (e.g. reload)
+    let matchedId = state.matchedComplaintId;
+    if (!matchedId && isFilled(state.socrates.chiefComplaint)) {
+      matchedId = matchChiefComplaint(state.socrates.chiefComplaint.value).id;
+    }
+
+    const answered = answeredFields(state);
+    const hadComplaintInterview =
+      Object.keys(state.complaintAnswers ?? {}).length > 0 ||
+      (state.chatHistory ?? []).some(
+        (e) => e.field && e.field !== "chiefComplaint"
+      );
+
+    // If a specific matched complaint is in progress (or recoverable)
+    if (matchedId) {
       const complaint =
-        QUESTION_BANK.find((c) => c.id === state.matchedComplaintId) ||
+        QUESTION_BANK.find((c) => c.id === matchedId) ||
         matchChiefComplaint(state.socrates.chiefComplaint.value);
 
-      const qIndex = state.complaintQuestionIndex ?? 0;
+      // Skip fields already present in chat / complaint answers
+      const qIndex = firstUnansweredComplaintIndex(complaint, answered, 0);
       if (qIndex < complaint.questions.length) {
         const q = complaint.questions[qIndex];
         if (q) {
@@ -474,26 +607,45 @@ export function nextQuestion(state: IntakeState): Prompt {
         }
       }
 
-      // If complaint was red flag and all 3 emergency questions asked -> escalate!
+      // If complaint was red flag and all emergency questions asked -> escalate!
       if (complaint.redFlag) {
         return { kind: "escalated", reason: complaint.id };
       }
-    } else {
-      // Standard SOCRATES sequence
-      for (const key of SOCRATES_ORDER) {
-        if (!isFilled(state.socrates[key])) {
-          const p = getPromptTranslation(key, lang);
-          return {
-            kind: "ask",
-            group: "socrates",
-            id: key,
-            text: p.text,
-            chips: p.chips,
-          };
-        }
+
+      // All complaint questions completed!
+      if (state.pathway === "ayush") {
+        return nextQuestion({
+          ...state,
+          phase: "dashavidha",
+          matchedComplaintId: matchedId,
+        });
       }
+
+      // Standard OPD: done — never drip into systemic ROS after complaint bank interview
+      return { kind: "complete" };
     }
 
+    // Already ran a complaint-style interview but lost matched id — do NOT restart ROS
+    if (hadComplaintInterview) {
+      if (state.pathway === "ayush") {
+        return nextQuestion({ ...state, phase: "dashavidha" });
+      }
+      return { kind: "complete" };
+    }
+
+    // Legacy SOCRATES fallback (only when no complaint interview happened)
+    for (const key of SOCRATES_ORDER) {
+      if (!isFilled(state.socrates[key])) {
+        const p = getPromptTranslation(key, lang);
+        return {
+          kind: "ask",
+          group: "socrates",
+          id: key,
+          text: p.text,
+          chips: p.chips,
+        };
+      }
+    }
     return nextQuestion({ ...state, phase: "ros" });
   }
 
@@ -532,6 +684,9 @@ export function nextQuestion(state: IntakeState): Prompt {
         return { kind: "ask", group: "aharaVihara", id: key, text: p.text, chips: p.chips };
       }
     }
+    if (state.matchedComplaintId) {
+      return { kind: "complete" };
+    }
     return nextQuestion({ ...state, phase: "history" });
   }
 
@@ -550,18 +705,14 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "redFlag") {
     const q = RED_FLAG_QUESTIONS[state.redFlagIndex];
     if (!q) {
-      return nextQuestion({ ...state, phase: "documents" });
+      return { kind: "complete" };
     }
     const rfText = getRedFlagTranslation(q.id, lang);
     const ynChips = getYesNoTranslation(lang);
     return { kind: "ask", group: "redFlag", id: q.id, text: rfText, yesNo: true, chips: ynChips };
   }
 
-  if (state.phase === "documents" || state.phase === "recap") {
-    return { kind: "complete" };
-  }
-
-  return { kind: "ask", group: "meta", id: state.phase, text: "Continue." };
+  return { kind: "complete" };
 }
 
 export function applyYesNo(state: IntakeState, questionId: string, yes: boolean): IntakeState {
@@ -610,71 +761,117 @@ export function applySlotAnswer(
     return escalateNow(state, interruptId);
   }
 
+  const existingHistory = state.chatHistory || [];
+
   if (group === "socrates") {
     // 1. Initial Chief complaint
     if (id === "chiefComplaint" || !isFilled(state.socrates.chiefComplaint)) {
       const matched = matchChiefComplaint(value);
-      return {
+      const isHi = (state.languageCode || "en-IN").startsWith("hi");
+      const questionText = isHi ? "आज आपको क्या मुख्य समस्या या तकलीफ है?" : "What is the main problem that brought you here today?";
+      const exchange: ChatExchange = {
+        id: "chiefComplaint",
+        question: questionText,
+        answer: value,
+        field: "chiefComplaint",
+        timestamp: Date.now(),
+      };
+
+      let nextState: IntakeState = {
         ...state,
         matchedComplaintId: matched.id,
         complaintQuestionIndex: 0,
         complaintAnswers: {},
+        chatHistory: [exchange],
         socrates: { ...state.socrates, chiefComplaint: fillSlot(source, value, 1) },
       };
+      // Avoid immediately re-asking "what's bothering you?" for general_other
+      if (matched.id === "general_other" && value.trim()) {
+        nextState = {
+          ...nextState,
+          complaintAnswers: { character_location: value.trim() },
+        };
+        nextState = mapComplaintFieldToState(
+          nextState,
+          "character_location",
+          value.trim(),
+          source
+        );
+        nextState = {
+          ...nextState,
+          complaintQuestionIndex: firstUnansweredComplaintIndex(
+            matched,
+            answeredFields(nextState),
+            0
+          ),
+        };
+      }
+      return nextState;
     }
 
     // 2. Answering complaint question or standard SOCRATES slot
-    const answers = { ...(state.complaintAnswers || {}), [id]: value };
+    const implied = harvestImpliedAnswers(value, id);
+    const answers: Record<string, string> = {
+      ...(state.complaintAnswers || {}),
+      [id]: value,
+      ...implied,
+    };
+
+    let mapped = mapComplaintFieldToState(state, id, value, source);
+    for (const [field, harvested] of Object.entries(implied)) {
+      mapped = mapComplaintFieldToState(mapped, field, harvested, source);
+    }
+
+    const complaint = QUESTION_BANK.find((c) => c.id === state.matchedComplaintId);
     const qIndex = state.complaintQuestionIndex ?? 0;
-    const nextQIndex = qIndex + 1;
-
-    const updatedSocrates = { ...state.socrates };
-    const updatedHistory = { ...state.history };
-
-    // Field mapping
-    if (id === "character_location") {
-      updatedSocrates.site = fillSlot(source, value, 1);
-      updatedSocrates.character = fillSlot(source, value, 1);
-    } else if (id === "trigger") {
-      updatedSocrates.exacerbatingRelieving = fillSlot(source, value, 1);
-    } else if (id === "onset") {
-      updatedSocrates.onset = fillSlot(source, value, 1);
-    } else if (id === "medication") {
-      updatedHistory.currentMedicines = fillSlot(source, value, 1);
-    } else if (id === "pattern") {
-      updatedSocrates.timing = fillSlot(source, value, 1);
-    } else if (id === "notes") {
-      updatedSocrates.associated = fillSlot(source, value, 1);
-    } else if (id === "severity_now") {
-      updatedSocrates.severity = fillSlot(source, value, 1);
+    let questionText = id;
+    if (complaint?.questions[qIndex]) {
+      const isHi = (state.languageCode || "en-IN").startsWith("hi");
+      questionText = isHi
+        ? complaint.questions[qIndex].hi
+        : complaint.questions[qIndex].en;
     }
 
-    if (id in updatedSocrates) {
-      updatedSocrates[id as SocratesKey] = fillSlot(source, value, 1);
-    }
+    const exchange: ChatExchange = {
+      id: `q-${id}-${Date.now()}`,
+      question: questionText,
+      answer: value,
+      field: id,
+      timestamp: Date.now(),
+    };
 
-    if (state.matchedComplaintId) {
-      const complaint = QUESTION_BANK.find((c) => c.id === state.matchedComplaintId);
-      if (complaint && complaint.redFlag && nextQIndex >= complaint.questions.length) {
-        return escalateNow(
-          {
-            ...state,
-            complaintQuestionIndex: nextQIndex,
-            complaintAnswers: answers,
-            socrates: updatedSocrates,
-            history: updatedHistory,
-          },
-          complaint.id
-        );
-      }
+    const harvestExchanges: ChatExchange[] = Object.entries(implied).map(
+      ([field, harvested]) => ({
+        id: `q-${field}-harvest-${Date.now()}`,
+        question: `[from prior answer] ${field}`,
+        answer: harvested,
+        field,
+        timestamp: Date.now(),
+      })
+    );
+
+    const newChatHistory = [...existingHistory, exchange, ...harvestExchanges];
+
+    const provisional = {
+      ...mapped,
+      complaintAnswers: answers,
+      chatHistory: newChatHistory,
+    };
+
+    const nextQIndex = complaint
+      ? firstUnansweredComplaintIndex(complaint, answeredFields(provisional), 0)
+      : qIndex + 1;
+
+    if (complaint && complaint.redFlag && nextQIndex >= complaint.questions.length) {
+      return escalateNow(
+        { ...provisional, complaintQuestionIndex: nextQIndex },
+        complaint.id
+      );
     }
 
     return {
-      ...state,
+      ...provisional,
       complaintQuestionIndex: nextQIndex,
-      complaintAnswers: answers,
-      socrates: updatedSocrates,
-      history: updatedHistory,
     };
   }
 

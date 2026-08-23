@@ -78,6 +78,93 @@ describe("Chief-complaint question bank", () => {
     }
   });
 
+  it("completes after answering all general_other questions without asking systemic ROS questions", () => {
+    let state = createInitialState("hi-IN");
+    state = { ...state, phase: "socrates" };
+
+    // 1. Initial question
+    state = applySlotAnswer(state, "socrates", "chiefComplaint", "शरीर में परेशानी");
+    expect(state.matchedComplaintId).toBe("general_other");
+
+    // 2. Question 1 (character_location)
+    state = applySlotAnswer(state, "socrates", "character_location", "शरीर में परेशानी");
+
+    // 3. Question 2 (trigger)
+    state = applySlotAnswer(state, "socrates", "trigger", "नहीं मैंने कोई दवाई ली नहीं है");
+
+    // 4. Question 3 (onset)
+    state = applySlotAnswer(state, "socrates", "onset", "कुछ दिनों से");
+
+    // 5. Question 4 (medication)
+    state = applySlotAnswer(state, "socrates", "medication", "अक्सर होता है");
+
+    // 6. Question 5 (pattern)
+    state = applySlotAnswer(state, "socrates", "pattern", "बार-बार होता है");
+
+    // 7. Question 6 (notes)
+    state = applySlotAnswer(state, "socrates", "notes", "जांच करानी है");
+
+    // Intake must now be complete! No ROS questions!
+    const follow = nextQuestion(state);
+    expect(follow.kind).toBe("complete");
+  });
+
+
+  it("skips already-answered complaint fields using chat history (no repeat questions)", () => {
+    let state = createInitialState("hi-IN");
+    state = { ...state, phase: "socrates" };
+
+    state = applySlotAnswer(state, "socrates", "chiefComplaint", "शरीर में परेशानी");
+    expect(state.matchedComplaintId).toBe("general_other");
+
+    // Patient answers trigger with both "no medicine" and "few days" in one utterance
+    state = applySlotAnswer(
+      state,
+      "socrates",
+      "trigger",
+      "नहीं मैंने कोई दवाई ली नहीं है यह मेरे को कुछ दिनों से है"
+    );
+
+    // onset + medication must be harvested from that answer and skipped
+    expect(state.complaintAnswers?.onset).toBeTruthy();
+    expect(state.complaintAnswers?.medication).toBeTruthy();
+
+    const next = nextQuestion(state);
+    expect(next.kind).toBe("ask");
+    if (next.kind === "ask") {
+      // Must NOT re-ask onset or medication
+      expect(next.id).not.toBe("onset");
+      expect(next.id).not.toBe("medication");
+      expect(next.id).not.toBe("trigger");
+    }
+  });
+
+  it("does not fall into ROS urine questions after general_other chat is finished", () => {
+    let state = createInitialState("hi-IN");
+    state = { ...state, phase: "socrates", pathway: "allopathic" };
+
+    state = applySlotAnswer(state, "socrates", "chiefComplaint", "शरीर में परेशानी");
+    state = applySlotAnswer(state, "socrates", "character_location", "शरीर में परेशानी");
+    state = applySlotAnswer(
+      state,
+      "socrates",
+      "trigger",
+      "नहीं मैंने कोई दवाई ली नहीं है यह मेरे को कुछ दिनों से है"
+    );
+    state = applySlotAnswer(state, "socrates", "pattern", "बार-बार होता है अक्सर होता है");
+    state = applySlotAnswer(state, "socrates", "notes", "जांच करानी है");
+
+    // Simulate lost matchedComplaintId (persist/reload bug) — must still NOT ask ROS
+    state = { ...state, matchedComplaintId: undefined };
+
+    const follow = nextQuestion(state);
+    expect(follow.kind).toBe("complete");
+    if (follow.kind === "ask") {
+      expect(follow.group).not.toBe("ros");
+      expect(follow.id).not.toBe("genitourinary");
+    }
+  });
+
   it("generates a clear doctor clinical summary", () => {
     const stomach = QUESTION_BANK.find((c) => c.id === "stomach_ache")!;
     const summary = buildDoctorClinicalSummary(stomach, [
