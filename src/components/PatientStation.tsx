@@ -76,6 +76,9 @@ export function PatientStation({
   const [bookingNotice, setBookingNotice] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [customName, setCustomName] = useState(displayName);
+  const [useManualDoctor, setUseManualDoctor] = useState(false);
+  const [manualDoctorName, setManualDoctorName] = useState("");
+
 
 
 
@@ -790,25 +793,76 @@ export function PatientStation({
             <p className="text-xs text-slate-500">Request an in-clinic or telemedicine OPD slot with a practitioner.</p>
           </div>
 
+          {/* Patient name prompt if still generic */}
+          {(!displayName || ["new patient","new user","patient","user"].includes(displayName.trim().toLowerCase())) && (
+            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-800">⚠️ Please set your name before booking</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="tl-input flex-1"
+                  placeholder="Your full name (e.g. Priya Sharma)"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                />
+                <button
+                  className="rounded-xl bg-[#1b343f] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#274d5d] whitespace-nowrap"
+                  onClick={async () => {
+                    if (!customName.trim()) return;
+                    await updateName({ sessionUserId, displayName: customName.trim() });
+                  }}
+                >
+                  Save Name
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             <label className="block">
               <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Select Doctor / Practitioner</span>
               <select
                 className="tl-input mt-1"
                 value={practId}
-                onChange={(e) => setPractId(e.target.value as Id<"users">)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__manual__") {
+                    setPractId("" as Id<"users">);
+                    setManualDoctorName("");
+                    setUseManualDoctor(true);
+                  } else {
+                    setUseManualDoctor(false);
+                    setPractId(val as Id<"users">);
+                  }
+                }}
               >
-                <option value="">Select Practitioner</option>
+                <option value="">— Select Practitioner —</option>
                 {practitioners?.map((p) => (
                   <option key={p._id} value={p._id}>
                     {p.displayName}
                   </option>
                 ))}
+                <option value="__manual__">➕ Enter doctor name manually</option>
               </select>
             </label>
 
+            {/* Manual doctor name input */}
+            {useManualDoctor && (
+              <label className="block">
+                <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Doctor&apos;s Name</span>
+                <input
+                  type="text"
+                  className="tl-input mt-1"
+                  placeholder="e.g. Dr. Rajesh Sharma"
+                  value={manualDoctorName}
+                  onChange={(e) => setManualDoctorName(e.target.value)}
+                  autoFocus
+                />
+              </label>
+            )}
+
             <label className="block">
-              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Preferred Date & Time</span>
+              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Preferred Date &amp; Time</span>
               <input
                 className="tl-input mt-1"
                 type="datetime-local"
@@ -847,16 +901,25 @@ export function PatientStation({
           <button
             className="btn-pulse px-5 py-2.5 text-xs font-semibold"
             onClick={async () => {
-              if (!practId || !slot) return;
+              if ((!practId && !useManualDoctor) || !slot) return;
+              if (useManualDoctor && !manualDoctorName.trim()) {
+                setBookingNotice("⚠️ Please enter the doctor's name.");
+                return;
+              }
               try {
                 const selectedPractitioner = practitioners?.find((p) => p._id === practId);
                 const scheduledTime = new Date(slot).getTime();
+                const doctorLabel = useManualDoctor
+                  ? manualDoctorName.trim()
+                  : selectedPractitioner?.displayName || "Practitioner";
 
                 await requestAppointment({
                   sessionUserId,
-                  practitionerUserId: practId,
+                  practitionerUserId: (useManualDoctor ? sessionUserId : practId) as Id<"users">,
                   scheduledAt: scheduledTime,
-                  notes: "Follow-up consultation",
+                  notes: useManualDoctor
+                    ? `Follow-up consultation with ${doctorLabel}`
+                    : "Follow-up consultation",
                   patientPhone: phone,
                   channel: "web",
                 });
@@ -868,10 +931,10 @@ export function PatientStation({
                     body: JSON.stringify({
                       to: phone,
                       patientName: displayName,
-                      practitionerName: selectedPractitioner?.displayName || "Practitioner",
+                      practitionerName: doctorLabel,
                       scheduledAt: scheduledTime,
                       status: "requested",
-                      notes: "Follow-up consultation",
+                      notes: `Follow-up consultation with ${doctorLabel}`,
                     }),
                   }).catch((err) => console.warn("WhatsApp alert trigger error:", err));
                 }
@@ -885,6 +948,7 @@ export function PatientStation({
           >
             Request Appointment Slot
           </button>
+
 
           {bookingNotice && (
             <div className="rounded-2xl bg-emerald-50 p-3 text-xs font-medium text-emerald-900 border border-emerald-200">

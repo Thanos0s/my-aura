@@ -363,18 +363,29 @@ export const listPractitioners = query({
       .query("users")
       .withIndex("by_role", (q) => q.eq("role", "practitioner"))
       .take(50);
-    
-    // Deduplicate by displayName or email, and exclude mistaken "New patient"
-    const seen = new Set<string>();
+
+    // Deduplicate by displayName only (even if different emails)
+    // Also filter out generic placeholder names
+    const GENERIC_NAMES = new Set([
+      "new practitioner",
+      "new patient",
+      "new user",
+      "practitioner",
+      "patient",
+      "user",
+    ]);
+
+    const seenNames = new Set<string>();
     const unique: PublicUser[] = [];
 
     for (const user of rows) {
       if (!user.active) continue;
-      if (user.displayName.trim().toLowerCase() === "new patient") continue;
-
-      const key = `${user.displayName.toLowerCase().trim()}_${user.email.toLowerCase().trim()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const nameLower = user.displayName.trim().toLowerCase();
+      // Skip generic placeholder names
+      if (GENERIC_NAMES.has(nameLower)) continue;
+      // Skip duplicate names
+      if (seenNames.has(nameLower)) continue;
+      seenNames.add(nameLower);
 
       unique.push({
         _id: user._id,
