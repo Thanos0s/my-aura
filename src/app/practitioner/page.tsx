@@ -6,7 +6,8 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { convexConfigured } from "@/app/providers";
 import { buildFhirBundle } from "@/lib/fhir/bundle";
-import { extractBlocksApprove } from "@/lib/documents/metadata";
+import { extractBlocksApprove, type DocumentKind } from "@/lib/documents/metadata";
+import { DocumentPipelinePanel } from "@/components/DocumentPipelinePanel";
 import {
   canCompleteIntake,
   DASHAVIDHA_FACTORS,
@@ -50,6 +51,8 @@ function PractitionerApp() {
   const detail = useQuery(api.visits.visitDetail, selected ? { visitId: selected } : "skip");
   const doctorEdit = useMutation(api.visits.doctorEdit);
   const approveVisit = useMutation(api.visits.approveVisit);
+  const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
+  const attachDocument = useMutation(api.documents.attachDocument);
   const reviewExtract = useMutation(api.documents.reviewExtract);
   const acknowledgeRedFlag = useMutation(api.visits.acknowledgeRedFlag);
   const saveNote = useMutation(api.clinical.savePractitionerNote);
@@ -60,12 +63,12 @@ function PractitionerApp() {
   const setAppt = useMutation(api.clinical.setAppointmentStatus);
   const sendMessage = useMutation(api.messaging.sendMessage);
   const [notice, setNotice] = useState("");
-  const [extractDraft, setExtractDraft] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [careTitle, setCareTitle] = useState("Care plan");
   const [careBody, setCareBody] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [msg, setMsg] = useState("");
+
 
   const patientId = detail?.visit.patientId ?? patientFilter;
   const chartArgs =
@@ -110,9 +113,71 @@ function PractitionerApp() {
     )
   );
 
+
   if (!sessionUserId) return null;
   const actorId = sessionUserId;
   const doctorName = session?.displayName ?? "Practitioner";
+
+
+  async function handleDoctorUpload(file: File, kind: DocumentKind) {
+    if (!selected) {
+      setNotice("Please select a visit from the queue to attach documents.");
+      return;
+    }
+
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!res.ok) throw new Error("File upload to storage failed");
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+
+      const ocrForm = new FormData();
+      ocrForm.append("file", file);
+      ocrForm.append("kind", kind);
+      const ocrRes = await fetch("/api/ocr", { method: "POST", body: ocrForm });
+      const ocrData = (await ocrRes.json()) as {
+        text?: string;
+        confidence?: number;
+        structured?: object;
+        failed?: boolean;
+      };
+
+      await attachDocument({
+        visitId: selected,
+        storageId,
+        kind: kind === "scan" ? "scan" : kind,
+        rawText: ocrData.text ?? "",
+        structuredJson: JSON.stringify(ocrData.structured ?? {}),
+        confidence: ocrData.confidence ?? 0,
+        failed: ocrData.failed,
+      });
+      setNotice(`Document attached (${kind}). Doctor review required before visit approval.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Document upload failed");
+    }
+  }
+
+  async function handleDoctorReview(
+    extractId: Id<"documentExtracts">,
+    status: "confirmed" | "corrected",
+    draftJson?: string
+  ) {
+    try {
+      await reviewExtract({
+        extractId,
+        reviewStatus: status,
+        structuredJson: draftJson,
+        sessionUserId: actorId,
+      });
+      setNotice(status === "confirmed" ? "Document extract confirmed." : "Document correction saved.");
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Review action failed");
+    }
+  }
 
   async function correct(path: string, original: string, next: string) {
     if (!selected || !intake) return;
@@ -162,8 +227,9 @@ function PractitionerApp() {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-3.5rem)] grid-cols-1 lg:grid-cols-[240px_1fr]">
+    <div className="grid min-h-[calc(100vh-3.5rem)] grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_400px]">
       <aside className="border-b border-graphite p-4 lg:border-r lg:border-b-0">
+
         <p className="tl-overline">Clinic</p>
         <h1 className="mt-1 text-xl">Practitioner</h1>
         <p className="mt-1 font-mono text-[11px] text-ash">Final authority. Never auto-diagnostic.</p>
@@ -451,68 +517,16 @@ function PractitionerApp() {
             </section>
 
             <section className="border-t border-graphite pt-4">
-              <p className="tl-overline">Document pipeline</p>
-              <h3 className="text-xl">OCR review</h3>
-              {detail.extracts.length === 0 ? <p className="mt-2 text-mist">No documents.</p> : null}
-              {detail.extracts.map((ex) => {
-                const blocked = extractBlocksApprove({
-                  reviewStatus: ex.reviewStatus,
-                  confidence: ex.confidence,
-                  structuredJson: ex.structuredJson,
-                });
-                return (
-                  <div key={ex._id} className={`tl-card mt-2 p-3 ${blocked ? "border-pulse" : ""}`}>
-                    <p className="tl-tag">
-                      confidence {Math.round(ex.confidence * 100)}% · {ex.reviewStatus}
-                    </p>
-                    <pre className="mt-2 whitespace-pre-wrap text-sm">{ex.rawText || "(empty)"}</pre>
-                    <textarea
-                      className="tl-input mt-2 text-sm"
-                      rows={3}
-                      defaultValue={ex.structuredJson}
-                      onChange={(e) => setExtractDraft((d) => ({ ...d, [ex._id]: e.target.value }))}
-                    />
-                    {ex.reviewStatus === "pending" || ex.reviewStatus === "failed" ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <button
-                          className="btn-pulse px-4 py-1.5 text-sm"
-                          onClick={() =>
-                            void reviewExtract({
-                              extractId: ex._id,
-                              reviewStatus: "confirmed",
-                              sessionUserId: actorId,
-                            })
-                          }
-                        >
-                          Confirm extraction
-                        </button>
-                        <button
-                          className="btn-ghost px-4 py-1.5 text-sm"
-                          onClick={() =>
-                            void reviewExtract({
-                              extractId: ex._id,
-                              reviewStatus: "corrected",
-                              structuredJson: extractDraft[ex._id] ?? ex.structuredJson,
-                              sessionUserId: actorId,
-                            })
-                          }
-                        >
-                          Save correction
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </section>
-
-            <section className="border-t border-graphite pt-4">
               <h3 className="text-xl">Doctor edits</h3>
-              {detail.edits.map((e) => (
-                <p key={e.createdAt} className="mt-1 font-mono text-sm text-mist">
-                  {e.fieldPath}: {e.originalValue} → {e.correctedValue} ({e.doctorName})
-                </p>
-              ))}
+              {detail.edits.length === 0 ? (
+                <p className="mt-1 text-xs text-mist">No manual corrections made yet.</p>
+              ) : (
+                detail.edits.map((e) => (
+                  <p key={e.createdAt} className="mt-1 font-mono text-sm text-mist">
+                    {e.fieldPath}: {e.originalValue} → {e.correctedValue} ({e.doctorName})
+                  </p>
+                ))
+              )}
             </section>
 
             <section className="border-t border-graphite pt-4">
@@ -523,15 +537,34 @@ function PractitionerApp() {
               </pre>
             </section>
 
+            {ocrBlocked ? (
+              <div className="rounded border border-pulse bg-onyx/90 p-4 text-xs">
+                <p className="font-semibold text-warning">⚠️ Approval Gated on Document Review</p>
+                <p className="mt-1 text-mist">
+                  Attached document extracts have pending reviews or low confidence scores. Confirm or correct them in the Document Pipeline panel on the right before finalizing this visit.
+                </p>
+              </div>
+            ) : null}
+
             <button className="btn-pulse px-6 py-3" disabled={ocrBlocked} onClick={() => void approve()}>
-              {ocrBlocked ? "Approve blocked — OCR review" : "Approve and save (practitioner)"}
+              {ocrBlocked ? "Approve blocked — Doctor OCR review required" : "Approve and save (practitioner)"}
             </button>
           </>
         )}
       </main>
+
+      <section className="border-t border-graphite p-4 xl:border-t-0 xl:border-l xl:p-6 min-w-0 bg-surface/30">
+        <DocumentPipelinePanel
+          extracts={detail?.extracts ?? []}
+          onUpload={handleDoctorUpload}
+          onReview={handleDoctorReview}
+          disabled={!selected}
+        />
+      </section>
     </div>
   );
 }
+
 
 function SlotFields({
   rows,

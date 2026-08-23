@@ -18,14 +18,15 @@ export const DOC_STAGES = [
 
 export type DocumentExtractItem = {
   _id: Id<"documentExtracts">;
-  documentId: Id<"documents">;
-  visitId: Id<"visits">;
   rawText: string;
-  structuredJson: string;
   confidence: number;
-  reviewStatus: "pending" | "confirmed" | "corrected" | "failed";
-  createdAt: number;
+  reviewStatus: string;
+  structuredJson: string;
+  documentId?: Id<"documents">;
+  visitId?: Id<"visits">;
+  createdAt?: number;
 };
+
 
 export function DocumentPipelinePanel({
   extracts = [],
@@ -275,11 +276,14 @@ export function DocumentPipelinePanel({
                       {meta?.kind || "Document"}
                     </span>
                     <span className="font-mono text-[10px] text-ash">
-                      {new Date(ex.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {ex.createdAt
+                        ? new Date(ex.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Attached"}
                     </span>
+
                   </div>
 
                   <span
