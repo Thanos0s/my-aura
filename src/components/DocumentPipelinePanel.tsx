@@ -32,6 +32,7 @@ export function DocumentPipelinePanel({
   extracts = [],
   onUpload,
   onReview,
+  viewMode = "practitioner",
   disabled = false,
 }: {
   extracts?: DocumentExtractItem[];
@@ -41,6 +42,7 @@ export function DocumentPipelinePanel({
     status: "confirmed" | "corrected",
     draftJson?: string
   ) => Promise<void>;
+  viewMode?: "practitioner" | "patient";
   disabled?: boolean;
 }) {
   const [selectedKind, setSelectedKind] = useState<DocumentKind>("prescription");
@@ -97,6 +99,15 @@ export function DocumentPipelinePanel({
     } catch {
       return null;
     }
+  }
+
+  function extractCleanPoints(text: string): string[] {
+    if (!text) return [];
+    const blocks = text
+      .split(/\n\n+|\n(?=[-•*]|\d+\.)/)
+      .map((s) => s.replace(/^[-•*]\s*|^\d+\.\s*/, "").trim())
+      .filter((s) => s.length > 0);
+    return blocks.length > 0 ? blocks : [text.trim()];
   }
 
   return (
@@ -263,7 +274,121 @@ export function DocumentPipelinePanel({
 
             const candidateMeds = meta?.structuredFields?.possibleMedicines ?? [];
             const candidateLabs = meta?.structuredFields?.possibleLabs ?? [];
+            const points = extractCleanPoints(ex.rawText);
 
+            // PATIENT CHATBOT FRIENDLY VIEW
+            if (viewMode === "patient") {
+              return (
+                <div
+                  key={ex._id}
+                  className="rounded-3xl bg-gradient-to-b from-white to-slate-50/60 p-5 shadow-sm border border-slate-200/80 transition-all space-y-3.5"
+                >
+                  {/* Chatbot Avatar Header */}
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#1b343f] to-teal-700 text-white text-base shadow-xs">
+                        🤖
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-900">Aura Health Bot</span>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-800">
+                            {badge.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Summary of your {meta?.kind || "uploaded prescription"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {ex.createdAt
+                        ? new Date(ex.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Today"}
+                    </span>
+                  </div>
+
+                  {/* Friendly Bot Speech Bubble */}
+                  <div className="rounded-2xl bg-sky-50/70 p-3.5 border border-sky-100/80">
+                    <p className="text-xs text-sky-950 font-medium leading-relaxed">
+                      💬 <em>&quot;Here is the simple breakdown of the document you uploaded:&quot;</em>
+                    </p>
+
+                    {/* Point-wise detected items */}
+                    <div className="mt-3 space-y-2">
+                      {points.map((pt, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 rounded-xl bg-white p-2.5 text-xs text-slate-800 shadow-2xs border border-sky-100"
+                        >
+                          <span className="text-sky-600 font-bold text-xs mt-0.5">•</span>
+                          <span className="leading-relaxed font-medium">{pt}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Medicines / Lab Quick Badges */}
+                  {(candidateMeds.length > 0 || candidateLabs.length > 0) && (
+                    <div className="rounded-2xl bg-slate-50 p-3 border border-slate-100 space-y-2">
+                      {candidateMeds.length > 0 && (
+                        <div>
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            💊 Detected Medicines
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {candidateMeds.map((med, i) => (
+                              <span
+                                key={i}
+                                className="rounded-lg bg-emerald-50 text-emerald-900 px-2.5 py-1 text-xs font-semibold border border-emerald-200"
+                              >
+                                {med}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {candidateLabs.length > 0 && (
+                        <div>
+                          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            🔬 Detected Lab Values
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {candidateLabs.map((lab, i) => (
+                              <span
+                                key={i}
+                                className="rounded-lg bg-indigo-50 text-indigo-900 px-2.5 py-1 text-xs font-semibold border border-indigo-200"
+                              >
+                                {lab}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Doctor Verification Status Notice */}
+                  <div className="flex items-center justify-between rounded-xl bg-slate-100/80 px-3 py-2 text-[11px]">
+                    <span className="text-slate-600">
+                      Doctor Review:{" "}
+                      <strong className={ex.reviewStatus === "confirmed" ? "text-emerald-700" : "text-amber-700"}>
+                        {ex.reviewStatus === "confirmed" ? "Verified by Doctor ✓" : "Pending Doctor Review"}
+                      </strong>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {ex.reviewStatus === "confirmed" ? "Ready" : "Will verify at OPD"}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            // PRACTITIONER DASHBOARD CLINICAL VIEW (Matches exact screenshot design)
             return (
               <div
                 key={ex._id}
@@ -271,11 +396,11 @@ export function DocumentPipelinePanel({
                   isBlocked ? "border-amber-300 ring-2 ring-amber-100" : "border-slate-100"
                 }`}
               >
-                {/* Card Top: Kind, Confidence, Review Badge */}
+                {/* Top Header Line */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                      {meta?.kind || "Document"}
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                      {meta?.kind || "PRESCRIPTION"}
                     </span>
                     <span className="font-mono text-[10px] text-slate-400">
                       {ex.createdAt
@@ -283,7 +408,7 @@ export function DocumentPipelinePanel({
                             hour: "2-digit",
                             minute: "2-digit",
                           })
-                        : "Attached"}
+                        : ""}
                     </span>
                   </div>
 
@@ -300,7 +425,7 @@ export function DocumentPipelinePanel({
                   </span>
                 </div>
 
-                {/* Status Indicator */}
+                {/* Status Line */}
                 <div className="mt-2 flex items-center justify-between text-xs">
                   <span className="font-mono text-[11px] text-slate-500">Status:</span>
                   <span
@@ -316,48 +441,25 @@ export function DocumentPipelinePanel({
                   </span>
                 </div>
 
-                {/* Candidate Hints from OCR */}
-                {(candidateMeds.length > 0 || candidateLabs.length > 0) && (
-                  <div className="mt-2.5 space-y-1.5 rounded-2xl bg-slate-50 p-2.5 text-xs border border-slate-100">
-                    {candidateMeds.length > 0 && (
-                      <div>
-                        <span className="font-mono text-[10px] font-bold text-slate-600 uppercase">
-                          💊 Detected Rx Hints:
-                        </span>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {candidateMeds.map((med, idx) => (
-                            <span
-                              key={idx}
-                              className="rounded-lg bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-800 border border-slate-200"
-                            >
-                              {med}
-                            </span>
-                          ))}
-                        </div>
+                {/* Detected Hints Section (Matching exact box styling in user screenshot) */}
+                <div className="mt-3">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                    💊 DETECTED RX HINTS:
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {points.map((pt, i) => (
+                      <div
+                        key={i}
+                        className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-2.5 font-mono text-[11px] text-slate-700 leading-relaxed"
+                      >
+                        {pt}
                       </div>
-                    )}
-                    {candidateLabs.length > 0 && (
-                      <div className="mt-1.5">
-                        <span className="font-mono text-[10px] font-bold text-slate-600 uppercase">
-                          🔬 Detected Lab Hints:
-                        </span>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {candidateLabs.map((lab, idx) => (
-                            <span
-                              key={idx}
-                              className="rounded-lg bg-white px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-800 border border-slate-200"
-                            >
-                              {lab}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                )}
+                </div>
 
                 {/* Collapsible Raw Text Inspector */}
-                <div className="mt-2.5">
+                <div className="mt-3 border-t border-slate-100 pt-2.5">
                   <button
                     type="button"
                     className="flex w-full items-center justify-between text-[11px] text-slate-500 hover:text-slate-800 font-semibold"
@@ -382,7 +484,7 @@ export function DocumentPipelinePanel({
                 <div className="mt-2.5">
                   <label className="block">
                     <span className="font-mono text-[10px] text-slate-500 uppercase font-semibold">
-                      Structured Extract / Correction:
+                      STRUCTURED EXTRACT / CORRECTION:
                     </span>
                     <textarea
                       className="tl-input mt-1 font-mono text-xs"
@@ -427,4 +529,5 @@ export function DocumentPipelinePanel({
     </aside>
   );
 }
+
 

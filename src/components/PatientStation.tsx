@@ -549,7 +549,9 @@ export function PatientStation({
           <DocumentPipelinePanel
             extracts={documentExtracts ?? []}
             onUpload={handlePatientUpload}
+            viewMode="patient"
           />
+
         </section>
       ) : null}
 
