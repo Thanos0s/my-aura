@@ -291,8 +291,20 @@ export const requestAppointment = mutation({
   handler: async (ctx, args) => {
     const user = await requireRole(ctx, args.sessionUserId, ["patient"]);
     if (!user.patientId) throw new Error("Patient record missing");
-    const pract = await ctx.db.get(args.practitionerUserId);
-    if (!pract || pract.role !== "practitioner") throw new Error("Practitioner not found");
+
+    // Resolve practitioner — allow any role so manual-name bookings can use a
+    // placeholder user ID; the display name is taken from `notes` in that case.
+    let practId = args.practitionerUserId;
+    const pract = await ctx.db.get(practId);
+    if (!pract) {
+      // Fall back to the first available practitioner in the system
+      const fallback = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "practitioner"))
+        .first();
+      if (!fallback) throw new Error("No practitioner accounts found. Please contact your clinic.");
+      practId = fallback._id;
+    }
 
     if (args.patientPhone) {
       await ctx.db.patch(user.patientId, { phoneNumber: args.patientPhone });
@@ -300,7 +312,7 @@ export const requestAppointment = mutation({
 
     return await ctx.db.insert("appointments", {
       patientId: user.patientId,
-      practitionerUserId: pract._id,
+      practitionerUserId: practId,
       scheduledAt: args.scheduledAt,
       status: "requested",
       notes: args.notes,
@@ -310,6 +322,7 @@ export const requestAppointment = mutation({
     });
   },
 });
+
 
 export const bookAppointmentFromWhatsApp = mutation({
   args: {

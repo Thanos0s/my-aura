@@ -901,7 +901,10 @@ export function PatientStation({
           <button
             className="btn-pulse px-5 py-2.5 text-xs font-semibold"
             onClick={async () => {
-              if ((!practId && !useManualDoctor) || !slot) return;
+              if ((!practId && !useManualDoctor) || !slot) {
+                setBookingNotice("⚠️ Please select a practitioner and date.");
+                return;
+              }
               if (useManualDoctor && !manualDoctorName.trim()) {
                 setBookingNotice("⚠️ Please enter the doctor's name.");
                 return;
@@ -913,9 +916,19 @@ export function PatientStation({
                   ? manualDoctorName.trim()
                   : selectedPractitioner?.displayName || "Practitioner";
 
+                // When using manual mode, fall back to the first real practitioner for the DB FK
+                const effectivePractId = useManualDoctor
+                  ? (practitioners?.[0]?._id ?? practId)
+                  : practId;
+
+                if (!effectivePractId) {
+                  setBookingNotice("⚠️ No practitioner accounts found. Please ask your clinic to set up a practitioner account.");
+                  return;
+                }
+
                 await requestAppointment({
                   sessionUserId,
-                  practitionerUserId: (useManualDoctor ? sessionUserId : practId) as Id<"users">,
+                  practitionerUserId: effectivePractId as Id<"users">,
                   scheduledAt: scheduledTime,
                   notes: useManualDoctor
                     ? `Follow-up consultation with ${doctorLabel}`
@@ -924,7 +937,7 @@ export function PatientStation({
                   channel: "web",
                 });
 
-                if (sendWhatsAppAlert && (phone || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_PHONE)) {
+                if (sendWhatsAppAlert && phone) {
                   fetch("/api/twilio/send-whatsapp", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -939,22 +952,35 @@ export function PatientStation({
                   }).catch((err) => console.warn("WhatsApp alert trigger error:", err));
                 }
 
-                setBookingNotice("✅ Appointment requested successfully! WhatsApp alert dispatched.");
+                // Reset form
+                setSlot("");
+                setPractId("" as Id<"users">);
+                setManualDoctorName("");
+                setUseManualDoctor(false);
+                setBookingNotice("✅ Appointment requested! The list below has been updated.");
                 setTimeout(() => setBookingNotice(""), 6000);
               } catch (err) {
-                setBookingNotice(err instanceof Error ? err.message : "Appointment booking failed");
+                setBookingNotice(`❌ ${err instanceof Error ? err.message : "Appointment booking failed"}`);
               }
             }}
           >
             Request Appointment Slot
           </button>
 
-
           {bookingNotice && (
-            <div className="rounded-2xl bg-emerald-50 p-3 text-xs font-medium text-emerald-900 border border-emerald-200">
+            <div
+              className={`rounded-2xl p-3 text-xs font-medium border ${
+                bookingNotice.startsWith("✅")
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                  : bookingNotice.startsWith("❌")
+                  ? "bg-red-50 text-red-900 border-red-200"
+                  : "bg-amber-50 text-amber-900 border-amber-200"
+              }`}
+            >
               {bookingNotice}
             </div>
           )}
+
 
           <div className="mt-6 pt-4 border-t border-slate-100">
             <p className="font-mono text-xs font-bold text-slate-700 uppercase tracking-wider">
