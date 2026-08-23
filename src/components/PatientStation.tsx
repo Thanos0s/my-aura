@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -35,6 +35,12 @@ export function PatientStation({
   const [routineDone, setRoutineDone] = useState<Record<string, boolean>>({ "pull-up": true });
   const [waterLogged, setWaterLogged] = useState(750);
   const [searchQuery, setSearchQuery] = useState("");
+  // Food browser state
+  const [foodSearch, setFoodSearch] = useState("");
+  const [foodCategory, setFoodCategory] = useState("All");
+  const [foodDoshaFilter, setFoodDoshaFilter] = useState<"all" | "vata" | "pitta" | "kapha">("all");
+  const [selectedFood, setSelectedFood] = useState<string | null>(null);
+  const [plansView, setPlansView] = useState<"plans" | "foods">("plans");
 
   const args = { sessionUserId };
   const symptoms = useQuery(api.clinical.listSymptoms, args);
@@ -47,6 +53,8 @@ export function PatientStation({
   const messages = useQuery(api.messaging.listMessages, args);
   const visits = useQuery(api.visits.listPatientVisits, args);
   const documentExtracts = useQuery(api.documents.listPatientDocumentExtracts, args);
+  const allFoods = useQuery(api.foods.listFoods, {});
+
 
   // Smart default tab: new patient (no visits) → AI Case Taking; returning patient → Dashboard
   useEffect(() => {
@@ -79,6 +87,33 @@ export function PatientStation({
   const attachDocument = useMutation(api.documents.attachDocument);
   const startVisit = useMutation(api.visits.startVisit);
   const updateName = useMutation(api.auth.updateProfileName);
+
+  // Derived food browser data
+  const foodCategories = useMemo(() => {
+    if (!allFoods) return ["All"];
+    const cats = Array.from(new Set(allFoods.map((f) => f.category)));
+    return ["All", ...cats.sort()];
+  }, [allFoods]);
+
+  const filteredFoods = useMemo(() => {
+    if (!allFoods) return [];
+    return allFoods.filter((f) => {
+      const matchesSearch =
+        !foodSearch ||
+        f.name.toLowerCase().includes(foodSearch.toLowerCase()) ||
+        f.description.toLowerCase().includes(foodSearch.toLowerCase()) ||
+        f.category.toLowerCase().includes(foodSearch.toLowerCase());
+      const matchesCategory = foodCategory === "All" || f.category === foodCategory;
+      const matchesDosha =
+        foodDoshaFilter === "all" || f.dosha[foodDoshaFilter] === "decrease";
+      return matchesSearch && matchesCategory && matchesDosha;
+    });
+  }, [allFoods, foodSearch, foodCategory, foodDoshaFilter]);
+
+  const selectedFoodItem = useMemo(
+    () => allFoods?.find((f) => f._id === selectedFood) ?? null,
+    [allFoods, selectedFood]
+  );
 
 
   const [symptomText, setSymptomText] = useState("");
@@ -734,42 +769,320 @@ export function PatientStation({
         </section>
       ) : null}
 
-      {/* TAB 6: CARE & DIET PLANS */}
+      {/* TAB 6: CARE & DIET PLANS + FOOD BROWSER */}
       {activeTab === "plans" ? (
-        <section className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-            <h2 className="text-lg font-bold text-slate-900">Practitioner-Approved Care</h2>
-            {care?.length === 0 ? <p className="mt-2 text-xs text-slate-400">None shared yet.</p> : null}
-            {care?.map((p) => (
-              <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
-                  {p.status}
-                </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
-                <p className="whitespace-pre-wrap text-xs text-slate-600 mt-1">{p.body}</p>
-              </article>
-            ))}
+        <section className="space-y-6">
+          {/* Toggle: Plans vs Food Browser */}
+          <div className="flex items-center gap-2 rounded-2xl bg-white/70 p-1.5 border border-slate-200/80 shadow-xs w-fit">
+            <button
+              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-all ${plansView === "plans" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
+              onClick={() => setPlansView("plans")}
+            >
+              💊 Care & Nutrition Plans
+            </button>
+            <button
+              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-all ${plansView === "foods" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
+              onClick={() => setPlansView("foods")}
+            >
+              🥗 Food Database ({allFoods?.length ?? "..."})
+            </button>
           </div>
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-            <h2 className="text-lg font-bold text-slate-900">Diet & Nutrition Plans</h2>
-            <p className="text-xs text-slate-400">Visible once approved by your practitioner.</p>
-            {diet?.map((p) => (
-              <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5">
-                  {p.practitionerApproved ? "practitioner approved" : "shareable"}
-                </span>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
-                <p className="text-xs text-slate-600 mt-1">{p.notes}</p>
-                <div className="mt-2 space-y-1">
-                  {p.meals.map((m) => (
-                    <p key={m._id} className="font-mono text-xs text-slate-700">
-                      <span className="font-bold">{m.label}:</span> {m.itemsText}
+
+          {/* ─── Plans View ─────────────────────────────────────────── */}
+          {plansView === "plans" && (
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
+                <h2 className="text-lg font-bold text-slate-900">Practitioner-Approved Care</h2>
+                {care?.length === 0 ? <p className="mt-2 text-xs text-slate-400">None shared yet.</p> : null}
+                {care?.map((p) => (
+                  <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
+                      {p.status}
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
+                    <p className="whitespace-pre-wrap text-xs text-slate-600 mt-1">{p.body}</p>
+                  </article>
+                ))}
+              </div>
+
+              <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-bold text-slate-900">Diet & Nutrition Plans</h2>
+                  <button
+                    className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold transition-colors border border-emerald-200"
+                    onClick={() => setPlansView("foods")}
+                  >
+                    🥗 Browse Food Database →
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400">Visible once approved by your practitioner.</p>
+                {diet?.length === 0 ? (
+                  <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+                    <p className="text-2xl">🥗</p>
+                    <p className="text-xs text-slate-500 font-medium">No diet plans shared yet.</p>
+                    <p className="text-[11px] text-slate-400">Your dietitian will share approved plans here. In the meantime, explore the food database!</p>
+                    <button
+                      className="mt-1 rounded-xl bg-[#1b343f] text-white px-4 py-2 text-xs font-bold hover:bg-[#274d5d] transition-colors"
+                      onClick={() => setPlansView("foods")}
+                    >
+                      Browse 299+ Foods →
+                    </button>
+                  </div>
+                ) : null}
+                {diet?.map((p) => (
+                  <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5">
+                      {p.practitionerApproved ? "✓ Practitioner Approved" : "Shared"}
+                    </span>
+                    <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
+                    <p className="text-xs text-slate-600 mt-1">{p.notes}</p>
+                    <div className="mt-2 space-y-1">
+                      {p.meals.map((m) => (
+                        <p key={m._id} className="font-mono text-xs text-slate-700">
+                          <span className="font-bold">{m.label}:</span> {m.itemsText}
+                        </p>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─── Food Database Browser ───────────────────────────────── */}
+          {plansView === "foods" && (
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">🥗 Ayurvedic Food Database</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {filteredFoods.length} of {allFoods?.length ?? 0} foods · Filter by dosha, category, or search
                     </p>
+                  </div>
+                  <button
+                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition-colors"
+                    onClick={() => setPlansView("plans")}
+                  >
+                    ← Back to Plans
+                  </button>
+                </div>
+
+                {/* Filters Row */}
+                <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
+                    <input
+                      type="text"
+                      className="tl-input pl-8 text-xs w-full"
+                      placeholder="Search foods (e.g. turmeric, rice, ghee...)"
+                      value={foodSearch}
+                      onChange={(e) => setFoodSearch(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Dosha Filter */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-2xl border border-slate-100 shrink-0">
+                    {(["all", "vata", "pitta", "kapha"] as const).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setFoodDoshaFilter(d)}
+                        className={`rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-all capitalize ${
+                          foodDoshaFilter === d
+                            ? "bg-[#1b343f] text-white shadow-xs"
+                            : "text-slate-500 hover:text-slate-800 hover:bg-white"
+                        }`}
+                      >
+                        {d === "all" ? "All Doshas" : `🌿 ${d.charAt(0).toUpperCase() + d.slice(1)}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category Pills */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {foodCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setFoodCategory(cat)}
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all border ${
+                        foodCategory === cat
+                          ? "bg-[#1b343f] text-white border-[#1b343f]"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                      }`}
+                    >
+                      {cat}
+                    </button>
                   ))}
                 </div>
-              </article>
-            ))}
-          </div>
+              </div>
+
+              {/* Food Grid + Detail Panel */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Food Card Grid */}
+                <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {allFoods === undefined ? (
+                    Array.from({ length: 9 }).map((_, i) => (
+                      <div key={i} className="rounded-2xl bg-white border border-slate-100 h-36 animate-pulse" />
+                    ))
+                  ) : filteredFoods.length === 0 ? (
+                    <div className="col-span-3 py-12 text-center text-slate-400">
+                      <p className="text-3xl mb-2">🔍</p>
+                      <p className="text-sm font-semibold">No foods found</p>
+                      <p className="text-xs mt-1">Try adjusting your search or filters</p>
+                    </div>
+                  ) : (
+                    filteredFoods.map((food) => (
+                      <button
+                        key={food._id}
+                        onClick={() => setSelectedFood(food._id === selectedFood ? null : food._id)}
+                        className={`rounded-2xl border text-left overflow-hidden transition-all hover:shadow-sm group ${
+                          selectedFood === food._id
+                            ? "border-[#1b343f] shadow-sm ring-2 ring-[#1b343f]/20"
+                            : "border-slate-200 bg-white hover:border-slate-400"
+                        }`}
+                      >
+                        {/* Food image */}
+                        <div className="relative h-24 w-full overflow-hidden bg-slate-100">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={food.imageUrl}
+                            alt={food.name}
+                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = `https://placehold.co/300x200/e2e8f0/64748b?text=${encodeURIComponent(food.name)}`;
+                            }}
+                          />
+                          {/* Dosha badges overlay */}
+                          <div className="absolute bottom-1 right-1 flex gap-0.5">
+                            {food.dosha.vata === "decrease" && (
+                              <span className="rounded-full bg-sky-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">V↓</span>
+                            )}
+                            {food.dosha.pitta === "decrease" && (
+                              <span className="rounded-full bg-orange-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">P↓</span>
+                            )}
+                            {food.dosha.kapha === "decrease" && (
+                              <span className="rounded-full bg-emerald-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">K↓</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Food info */}
+                        <div className="p-2.5">
+                          <p className="font-bold text-xs text-slate-900 truncate leading-tight">{food.name}</p>
+                          <p className="font-mono text-[10px] text-slate-400 mt-0.5 truncate">{food.category}</p>
+                          <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                            {food.taste.slice(0, 2).map((t) => (
+                              <span key={t} className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-semibold px-1.5 py-0.5 capitalize">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Detail Panel */}
+                <div className="lg:col-span-1">
+                  {selectedFoodItem ? (
+                    <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden sticky top-4">
+                      <div className="relative h-40 w-full overflow-hidden bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedFoodItem.imageUrl}
+                          alt={selectedFoodItem.name}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = `https://placehold.co/400x200/e2e8f0/64748b?text=${encodeURIComponent(selectedFoodItem.name)}`;
+                          }}
+                        />
+                        <button
+                          onClick={() => setSelectedFood(null)}
+                          className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/40 text-white text-xs flex items-center justify-center hover:bg-black/60 transition-colors"
+                        >
+                          ✕
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
+                          <p className="font-bold text-white text-sm">{selectedFoodItem.name}</p>
+                          <p className="text-white/80 text-[11px]">{selectedFoodItem.category}</p>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {/* Description */}
+                        <p className="text-xs text-slate-700 leading-relaxed">{selectedFoodItem.description}</p>
+
+                        {/* Dosha Impact */}
+                        <div className="space-y-1.5">
+                          <p className="font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dosha Impact</p>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {(["vata", "pitta", "kapha"] as const).map((d) => (
+                              <div
+                                key={d}
+                                className={`rounded-xl p-2 text-center text-[10px] font-bold border ${
+                                  selectedFoodItem.dosha[d] === "decrease"
+                                    ? d === "vata" ? "bg-sky-50 text-sky-800 border-sky-200"
+                                      : d === "pitta" ? "bg-orange-50 text-orange-800 border-orange-200"
+                                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : "bg-slate-50 text-slate-500 border-slate-100"
+                                }`}
+                              >
+                                <div className="capitalize font-semibold">{d}</div>
+                                <div className="mt-0.5">{selectedFoodItem.dosha[d] === "decrease" ? "↓ Pacifies" : selectedFoodItem.dosha[d] === "increase" ? "↑ Increases" : "→ Neutral"}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Nutrition */}
+                        <div className="space-y-1.5">
+                          <p className="font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nutrition (per 100g)</p>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {(["calories", "protein", "carbs", "fat"] as const).map((n) => (
+                              <div key={n} className="rounded-xl bg-slate-50 border border-slate-100 p-2">
+                                <p className="text-[10px] text-slate-400 capitalize">{n}</p>
+                                <p className="font-bold text-xs text-slate-800">{selectedFoodItem.nutrition[n]}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Taste & Season */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedFoodItem.taste.map((t) => (
+                            <span key={t} className="rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2 py-0.5 capitalize">
+                              🌿 {t}
+                            </span>
+                          ))}
+                          {selectedFoodItem.bestSeason.map((s) => (
+                            <span key={s} className="rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-semibold px-2 py-0.5">
+                              📅 {s}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Energy */}
+                        <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 font-medium">Virya (Energy)</span>
+                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${selectedFoodItem.energy === "hot" ? "bg-red-100 text-red-700" : "bg-sky-100 text-sky-700"}`}>
+                            {selectedFoodItem.energy === "hot" ? "🔥 Hot" : "❄️ Cold"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-3xl bg-white border border-dashed border-slate-200 p-8 text-center space-y-2 sticky top-4">
+                      <p className="text-3xl">🥗</p>
+                      <p className="text-sm font-semibold text-slate-700">Select a food to see details</p>
+                      <p className="text-xs text-slate-400">Dosha impact, nutrition facts, Virya energy, taste (Shad Rasa), and best seasons</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       ) : null}
 

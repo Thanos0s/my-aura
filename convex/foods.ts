@@ -25,3 +25,10 @@ export const findImagesByKeys = query({
     return out;
   },
 });
+
+export const listFoods = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("foods").take(500);
+  },
+});
