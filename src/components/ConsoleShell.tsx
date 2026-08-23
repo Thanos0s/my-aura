@@ -17,11 +17,12 @@ function isActive(pathname: string, href: string) {
 
 const PUBLIC_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#capabilities", label: "Capabilities" },
   { href: "/login/patient", label: "Patient" },
   { href: "/login/doctor", label: "Practitioner" },
   { href: "/login/admin", label: "Admin" },
 ] as const;
+
 
 export function ConsoleShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();

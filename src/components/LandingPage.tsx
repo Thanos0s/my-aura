@@ -95,32 +95,9 @@ export function LandingPage() {
       </section>
 
 
-      {/* How it Works Grid */}
-      <section id="how-it-works" className="space-y-6">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Website Flow</p>
-          <h2 className="text-2xl font-bold text-slate-900">How You Move Through My Aura</h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { n: "01", t: "Landing & Overview", d: "Explore capabilities, clinical safety rules, and architecture." },
-            { n: "02", t: "Role Authentication", d: "Role-specific PIN gateways with instant demo seeding." },
-            { n: "03", t: "Clinical Workstation", d: "Patient dashboard, practitioner OPD desk, or dietitian studio." },
-            { n: "04", t: "Ayurvedic Care Loop", d: "SOCRATES intake → Dashavidha exam → Dietitian referral → FHIR export." },
-          ].map((step) => (
-            <div key={step.n} className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-sky-100 text-sky-900 font-mono text-xs font-bold">
-                {step.n}
-              </span>
-              <p className="text-base font-bold text-slate-900">{step.t}</p>
-              <p className="text-xs text-slate-500 leading-relaxed">{step.d}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Capabilities */}
-      <section className="space-y-6">
+      <section id="capabilities" className="space-y-6">
+
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Capabilities</p>
           <h2 className="text-2xl font-bold text-slate-900">Everything on the Clinic Floor</h2>
