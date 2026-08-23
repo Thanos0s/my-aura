@@ -13,23 +13,46 @@ export function useAuthFromFirebase() {
     if (!enabled) {
       setIsLoading(false);
       setIsAuthenticated(false);
-      return;
+      return undefined;
     }
-    return onAuthStateChanged(getFirebaseAuth(), (next) => {
-      setIsAuthenticated(next != null);
+    try {
+      const auth = getFirebaseAuth();
+      return onAuthStateChanged(
+        auth,
+        (next) => {
+          setIsAuthenticated(next != null);
+          setIsLoading(false);
+        },
+        (error) => {
+          console.warn("Firebase onAuthStateChanged error:", error);
+          setIsLoading(false);
+          setIsAuthenticated(false);
+        }
+      );
+    } catch (err) {
+      console.warn("Failed to initialize Firebase Auth listener:", err);
       setIsLoading(false);
-    });
+      setIsAuthenticated(false);
+      return undefined;
+    }
   }, [enabled]);
 
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
       if (!isFirebaseConfigured()) return null;
-      const current = getFirebaseAuth().currentUser;
-      if (!current) return null;
-      return await current.getIdToken(forceRefreshToken);
+      try {
+        const auth = getFirebaseAuth();
+        const current = auth.currentUser;
+        if (!current) return null;
+        return await current.getIdToken(forceRefreshToken);
+      } catch (err) {
+        console.warn("Failed to fetch Firebase token:", err);
+        return null;
+      }
     },
     []
   );
+
 
   return useMemo(
     () => ({

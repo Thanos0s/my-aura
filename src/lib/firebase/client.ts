@@ -16,24 +16,34 @@ export function getFirebaseAuth(): Auth {
   if (!isFirebaseConfigured()) {
     throw new Error("Firebase Auth is not configured");
   }
-  const app = getApps().length
-    ? getApp()
-    : initializeApp({
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-        measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-      });
-  return getAuth(app);
+  try {
+    const app = getApps().length
+      ? getApp()
+      : initializeApp({
+          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+        });
+    return getAuth(app);
+  } catch (e) {
+    if (getApps().length) return getAuth(getApp());
+    throw e;
+  }
 }
 
 export async function signOutFirebase(): Promise<void> {
   if (!isFirebaseConfigured()) return;
-  await signOut(getFirebaseAuth());
+  try {
+    const auth = getFirebaseAuth();
+    if (auth) await signOut(auth);
+  } catch {
+    // ignore
+  }
 }
+
 
 export function firebaseAuthMessage(error: unknown): string {
   const code =

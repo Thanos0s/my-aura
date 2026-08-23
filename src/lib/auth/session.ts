@@ -21,40 +21,59 @@ export type SessionSnapshot = {
 
 export function emitSessionChange() {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(SESSION_EVENT));
+  try {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  } catch {
+    // ignore
+  }
 }
 
 export function readSession(): SessionSnapshot | null {
   if (typeof window === "undefined") return null;
-  const userId = localStorage.getItem(SESSION_USER_KEY);
-  const role = localStorage.getItem(SESSION_ROLE_KEY) as Role | null;
-  const email = localStorage.getItem(SESSION_EMAIL_KEY);
-  const displayName = localStorage.getItem(SESSION_NAME_KEY);
-  if (!userId || !role || !email) return null;
-  return {
-    userId,
-    role,
-    email,
-    displayName: displayName ?? email,
-    patientId: localStorage.getItem(SESSION_PATIENT_KEY),
-  };
+  try {
+    const userId = localStorage.getItem(SESSION_USER_KEY);
+    const role = localStorage.getItem(SESSION_ROLE_KEY) as Role | null;
+    const email = localStorage.getItem(SESSION_EMAIL_KEY);
+    const displayName = localStorage.getItem(SESSION_NAME_KEY);
+    if (!userId || !role || !email) return null;
+    return {
+      userId,
+      role,
+      email,
+      displayName: displayName ?? email,
+      patientId: localStorage.getItem(SESSION_PATIENT_KEY),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function writeSession(session: SessionSnapshot) {
-  localStorage.setItem(SESSION_USER_KEY, session.userId);
-  localStorage.setItem(SESSION_ROLE_KEY, session.role);
-  localStorage.setItem(SESSION_EMAIL_KEY, session.email);
-  localStorage.setItem(SESSION_NAME_KEY, session.displayName);
-  if (session.patientId) localStorage.setItem(SESSION_PATIENT_KEY, session.patientId);
-  else localStorage.removeItem(SESSION_PATIENT_KEY);
-  emitSessionChange();
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SESSION_USER_KEY, session.userId);
+    localStorage.setItem(SESSION_ROLE_KEY, session.role);
+    localStorage.setItem(SESSION_EMAIL_KEY, session.email);
+    localStorage.setItem(SESSION_NAME_KEY, session.displayName);
+    if (session.patientId) localStorage.setItem(SESSION_PATIENT_KEY, session.patientId);
+    else localStorage.removeItem(SESSION_PATIENT_KEY);
+    emitSessionChange();
+  } catch {
+    // ignore
+  }
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_USER_KEY);
-  localStorage.removeItem(SESSION_ROLE_KEY);
-  localStorage.removeItem(SESSION_EMAIL_KEY);
-  localStorage.removeItem(SESSION_NAME_KEY);
-  localStorage.removeItem(SESSION_PATIENT_KEY);
-  emitSessionChange();
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(SESSION_USER_KEY);
+    localStorage.removeItem(SESSION_ROLE_KEY);
+    localStorage.removeItem(SESSION_EMAIL_KEY);
+    localStorage.removeItem(SESSION_NAME_KEY);
+    localStorage.removeItem(SESSION_PATIENT_KEY);
+    emitSessionChange();
+  } catch {
+    // ignore
+  }
 }
+

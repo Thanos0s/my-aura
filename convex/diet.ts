@@ -200,23 +200,32 @@ export const listDietPlans = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return [];
     let patientId = args.patientId;
     if (user.role === "patient") {
-      if (!user.patientId) throw new Error("Patient record missing");
       patientId = user.patientId;
+      if (!patientId) {
+        const p = await ctx.db
+          .query("patients")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .first();
+        patientId = p?._id;
+      }
+      if (!patientId) return [];
     } else if (!patientId) {
-      throw new Error("patientId required");
+      return [];
     } else if (user.role === "dietitian") {
       const ref = await openReferralFor(ctx, patientId, user._id);
-      if (!ref) throw new Error("Unauthorized: no referral");
+      if (!ref) return [];
     } else if (user.role !== "practitioner" && user.role !== "admin") {
-      throw new Error("Unauthorized");
+      return [];
     }
     const plans = await ctx.db
       .query("dietPlans")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId!))
       .take(20);
+
     const visible = plans.filter((p) => {
       if (user.role === "patient") return p.practitionerApproved || p.shareable;
       return true;

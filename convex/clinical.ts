@@ -42,8 +42,10 @@ export const listSymptoms = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
+    if (!patientId) return [];
     const rows = await ctx.db
       .query("symptomLogs")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -56,6 +58,7 @@ export const listSymptoms = query({
       createdAt: r.createdAt,
     }));
   },
+
 });
 
 export const upsertLifestyle = mutation({
@@ -115,8 +118,10 @@ export const getLifestyle = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return null;
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
+    if (!patientId) return null;
     const rows = await ctx.db
       .query("lifestyleLogs")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -193,8 +198,10 @@ export const listCarePlans = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
+    if (!patientId) return [];
     const rows = await ctx.db
       .query("carePlans")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -246,8 +253,10 @@ export const listAdherence = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return [];
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
+    if (!patientId) return [];
     const rows = await ctx.db
       .query("adherenceLogs")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -260,6 +269,7 @@ export const listAdherence = query({
       done: r.done,
       createdAt: r.createdAt,
     }));
+
   },
 });
 
@@ -321,7 +331,8 @@ export const listAppointments = query({
     })
   ),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx, args.sessionUserId);
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) return [];
     if (user.role === "practitioner") {
       const rows = await ctx.db
         .query("appointments")
@@ -336,6 +347,7 @@ export const listAppointments = query({
       }));
     }
     const patientId = await resolvePatientScope(ctx, user, args.patientId);
+    if (!patientId) return [];
     const rows = await ctx.db
       .query("appointments")
       .withIndex("by_patient", (q) => q.eq("patientId", patientId))
@@ -343,6 +355,7 @@ export const listAppointments = query({
     return rows.map((r) => ({
       _id: r._id,
       scheduledAt: r.scheduledAt,
+
       status: r.status,
       notes: r.notes,
       practitionerUserId: r.practitionerUserId,
@@ -459,18 +472,24 @@ async function resolvePatientScope(
   ctx: Parameters<typeof requireUser>[0],
   user: Awaited<ReturnType<typeof requireUser>>,
   requested?: Id<"patients">
-): Promise<Id<"patients">> {
+): Promise<Id<"patients"> | null> {
   if (user.role === "patient") {
-    if (!user.patientId) throw new Error("Patient record missing");
-    if (requested && requested !== user.patientId) throw new Error("Unauthorized");
-    return user.patientId;
+    if (user.patientId) return user.patientId;
+    const existing = await ctx.db
+      .query("patients")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    if (existing) return existing._id;
+    return null;
   }
-  if (!requested) throw new Error("patientId required");
+  if (!requested) return null;
   if (user.role === "dietitian") {
     const ref = await openReferralFor(ctx, requested, user._id);
-    if (!ref) throw new Error("Unauthorized: no referral");
+    if (!ref) return null;
   } else if (user.role !== "practitioner" && user.role !== "admin") {
-    throw new Error("Unauthorized");
+    return null;
   }
   return requested;
 }
+
+
