@@ -62,13 +62,13 @@ function PractitionerApp() {
   const approveDiet = useMutation(api.diet.approveDietPlan);
   const setAppt = useMutation(api.clinical.setAppointmentStatus);
   const sendMessage = useMutation(api.messaging.sendMessage);
+  const [viewMode, setViewMode] = useState<"split" | "desk" | "pipeline">("split");
   const [notice, setNotice] = useState("");
   const [note, setNote] = useState("");
   const [careTitle, setCareTitle] = useState("Care plan");
   const [careBody, setCareBody] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [msg, setMsg] = useState("");
-
 
   const patientId = detail?.visit.patientId ?? patientFilter;
   const chartArgs =
@@ -113,18 +113,15 @@ function PractitionerApp() {
     )
   );
 
-
   if (!sessionUserId) return null;
   const actorId = sessionUserId;
   const doctorName = session?.displayName ?? "Practitioner";
-
 
   async function handleDoctorUpload(file: File, kind: DocumentKind) {
     if (!selected) {
       setNotice("Please select a visit from the queue to attach documents.");
       return;
     }
-
     try {
       const uploadUrl = await generateUploadUrl();
       const res = await fetch(uploadUrl, {
@@ -227,9 +224,14 @@ function PractitionerApp() {
   }
 
   return (
-    <div className="grid min-h-[calc(100vh-3.5rem)] grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_400px]">
+    <div
+      className={`grid min-h-[calc(100vh-3.5rem)] grid-cols-1 ${
+        viewMode === "split"
+          ? "lg:grid-cols-[220px_1fr_380px] 2xl:grid-cols-[250px_1fr_420px]"
+          : "lg:grid-cols-[240px_1fr]"
+      }`}
+    >
       <aside className="border-b border-graphite p-4 lg:border-r lg:border-b-0">
-
         <p className="tl-overline">Clinic</p>
         <h1 className="mt-1 text-xl">Practitioner</h1>
         <p className="mt-1 font-mono text-[11px] text-ash">Final authority. Never auto-diagnostic.</p>
@@ -271,8 +273,52 @@ function PractitionerApp() {
           ))}
         </ul>
       </aside>
-      <main className="space-y-6 p-4 md:p-6">
-        {!detail ? <p className="text-mist">Select a visit from the queue.</p> : (
+      <main className="space-y-6 p-4 md:p-6 min-w-0">
+        {!detail ? (
+          <p className="text-mist">Select a visit from the queue.</p>
+        ) : viewMode === "pipeline" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-graphite pb-4">
+              <div>
+                <p className="tl-overline">Case Documents</p>
+                <h2 className="mt-1 text-2xl font-bold">{detail.patientName}</h2>
+                <p className="mt-0.5 text-xs text-mist">
+                  {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway} · {detail.visit.languageCode}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 rounded border border-graphite bg-onyx p-1">
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs font-medium rounded text-mist hover:text-display"
+                  onClick={() => setViewMode("split")}
+                >
+                  🔲 3-Column Split
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs font-medium rounded text-mist hover:text-display"
+                  onClick={() => setViewMode("desk")}
+                >
+                  📋 Consultation Desk
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs font-medium rounded bg-pulse text-onyx font-semibold"
+                  onClick={() => setViewMode("pipeline")}
+                >
+                  📄 Document Pipeline & OCR ({detail.extracts.length})
+                </button>
+              </div>
+            </div>
+
+            <DocumentPipelinePanel
+              extracts={detail.extracts}
+              onUpload={handleDoctorUpload}
+              onReview={handleDoctorReview}
+              disabled={!selected}
+            />
+          </div>
+        ) : (
           <>
             {detail.flags.some((f) => f.escalationStatus === "open") ? (
               <div className="tl-card border-pulse bg-onyx p-4">
@@ -290,14 +336,74 @@ function PractitionerApp() {
                 ))}
               </div>
             ) : null}
-            <div className="border-b border-graphite pb-4">
-              <p className="tl-overline">Case</p>
-              <h2 className="mt-1 text-3xl">{detail.patientName}</h2>
-              <p className="mt-1 text-mist">
-                {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway}
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-graphite pb-4">
+              <div>
+                <p className="tl-overline">Case</p>
+                <h2 className="mt-1 text-2xl font-bold">{detail.patientName}</h2>
+                <p className="mt-0.5 text-xs text-mist">
+                  {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 rounded border border-graphite bg-onyx p-1">
+                <button
+                  type="button"
+                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                    viewMode === "split"
+                      ? "bg-pulse text-onyx font-semibold"
+                      : "text-mist hover:text-display"
+                  }`}
+                  onClick={() => setViewMode("split")}
+                >
+                  🔲 3-Column Split
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                    viewMode === "desk"
+                      ? "bg-pulse text-onyx font-semibold"
+                      : "text-mist hover:text-display"
+                  }`}
+                  onClick={() => setViewMode("desk")}
+                >
+                  📋 Consultation Desk
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-medium rounded text-mist hover:text-display transition-colors"
+                  onClick={() => setViewMode("pipeline")}
+                >
+                  📄 Document Pipeline & OCR ({detail.extracts.length})
+                </button>
+
+              </div>
             </div>
+
+            {viewMode === "desk" && (
+              <div className="flex items-center justify-between rounded border border-graphite bg-onyx/70 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">📄</span>
+                  <div>
+                    <p className="text-xs font-semibold text-display">
+                      Document Pipeline: {detail.extracts.length} attached {ocrBlocked ? "· review pending" : ""}
+                    </p>
+                    <p className="text-[11px] text-mist">
+                      Physical documents are reviewed in the dedicated OCR station without auto-merging into meds/allergies.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1 text-xs"
+                  onClick={() => setViewMode("pipeline")}
+                >
+                  Open Document Station →
+                </button>
+              </div>
+            )}
             {notice ? <p className="tl-surface p-3 font-mono text-sm text-warning">{notice}</p> : null}
+
+
 
             <section>
               <p className="tl-overline">History</p>
@@ -553,17 +659,20 @@ function PractitionerApp() {
         )}
       </main>
 
-      <section className="border-t border-graphite p-4 xl:border-t-0 xl:border-l xl:p-6 min-w-0 bg-surface/30">
-        <DocumentPipelinePanel
-          extracts={detail?.extracts ?? []}
-          onUpload={handleDoctorUpload}
-          onReview={handleDoctorReview}
-          disabled={!selected}
-        />
-      </section>
+      {viewMode === "split" && (
+        <section className="border-t border-graphite p-4 lg:border-t-0 lg:border-l lg:p-5 min-w-0 bg-surface/20">
+          <DocumentPipelinePanel
+            extracts={detail?.extracts ?? []}
+            onUpload={handleDoctorUpload}
+            onReview={handleDoctorReview}
+            disabled={!selected}
+          />
+        </section>
+      )}
     </div>
   );
 }
+
 
 
 function SlotFields({

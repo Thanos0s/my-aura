@@ -4,9 +4,12 @@ import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { DocumentPipelinePanel } from "./DocumentPipelinePanel";
+import type { DocumentKind } from "@/lib/documents/metadata";
 
 type Tab =
   | "intake"
+  | "documents"
   | "symptoms"
   | "lifestyle"
   | "plans"
@@ -34,12 +37,16 @@ export function PatientStation({
   const practitioners = useQuery(api.auth.listPractitioners, args);
   const messages = useQuery(api.messaging.listMessages, args);
   const visits = useQuery(api.visits.listPatientVisits, args);
+  const documentExtracts = useQuery(api.documents.listPatientDocumentExtracts, args);
 
   const logSymptom = useMutation(api.clinical.logSymptom);
   const upsertLifestyle = useMutation(api.clinical.upsertLifestyle);
   const logAdherence = useMutation(api.clinical.logAdherence);
   const requestAppointment = useMutation(api.clinical.requestAppointment);
   const sendMessage = useMutation(api.messaging.sendMessage);
+  const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
+  const attachDocument = useMutation(api.documents.attachDocument);
+  const startVisit = useMutation(api.visits.startVisit);
 
   const [symptomText, setSymptomText] = useState("");
   const [severity, setSeverity] = useState(3);
@@ -57,6 +64,101 @@ export function PatientStation({
   const [slot, setSlot] = useState("");
   const [practId, setPractId] = useState<Id<"users"> | "">("");
 
+  async function handlePatientUpload(file: File, kind: DocumentKind) {
+    const postUrl = await generateUploadUrl({});
+    const result = await fetch(postUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    if (!result.ok) throw new Error("File upload failed");
+    const json = (await result.json()) as { storageId: Id<"_storage"> };
+
+    const ocrForm = new FormData();
+    ocrForm.append("file", file);
+    ocrForm.append("kind", kind);
+    const ocrRes = await fetch("/api/ocr", { method: "POST", body: ocrForm });
+    const ocrData = (await ocrRes.json()) as {
+      text?: string;
+      confidence?: number;
+      structured?: object;
+      failed?: boolean;
+    };
+
+    let activeVisitId = visits?.[0]?._id;
+    if (!activeVisitId) {
+      activeVisitId = await startVisit({
+        displayName,
+        languageCode: "en-IN",
+        pathway: "ayush",
+        answeredBy: "patient",
+        kioskId: "patient-portal",
+        shareHistory: true,
+        shareAyush: true,
+        shareAbha: false,
+        retainAfterEncounter: true,
+        intakeJson: JSON.stringify({
+
+          phase: "documents",
+          consent: { shareHistory: true, shareAyush: true, shareAbha: false, retainAfterEncounter: true },
+          answeredBy: "patient",
+          pathway: "ayush",
+          language: "en-IN",
+          socrates: {
+            chiefComplaint: { value: "Document upload", status: "unasked", confidence: 1, source: "patient" },
+            site: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            onset: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            character: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            radiation: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            associated: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            timing: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            exacerbatingRelieving: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            severity: { value: "", status: "unasked", confidence: 1, source: "patient" },
+          },
+          dashavidha: {
+            dushya: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            desha: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            bala: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            kala: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            anala: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            prakriti: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            vayas: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            sattva: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            satmya: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            ahara: { value: "", status: "unasked", confidence: 1, source: "patient" },
+          },
+          history: {
+            pastMedical: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            currentMedicines: { value: "none known", status: "unasked", confidence: 1, source: "patient" },
+            allergies: { value: "none known", status: "unasked", confidence: 1, source: "patient" },
+            familyHistory: { value: "", status: "unasked", confidence: 1, source: "patient" },
+          },
+          ros: {},
+          aharaVihara: {
+            mealTimes: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            dietType: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            sleep: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            waterIntake: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            teaCoffeeSubstances: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            notes: { value: "", status: "unasked", confidence: 1, source: "patient" },
+          },
+          patientRecapConfirmed: false,
+        }),
+        sessionUserId,
+      });
+    }
+
+    await attachDocument({
+      visitId: activeVisitId,
+      storageId: json.storageId,
+      kind: kind === "scan" ? "scan" : kind,
+      rawText: ocrData.text ?? "",
+      structuredJson: JSON.stringify(ocrData.structured ?? {}),
+      confidence: ocrData.confidence ?? 0,
+      failed: ocrData.failed,
+    });
+  }
+
   return (
     <div className="px-4 py-6 md:px-8">
       <p className="tl-overline">Portal</p>
@@ -67,7 +169,8 @@ export function PatientStation({
       <div className="mt-4 flex flex-wrap gap-2">
         {(
           [
-            ["intake", "Case taking / reports"],
+            ["intake", "Case taking"],
+            ["documents", `Documents & OCR (${documentExtracts?.length ?? 0})`],
             ["symptoms", "Symptoms"],
             ["lifestyle", "Ahara-Vihara"],
             ["plans", "Care & diet"],
@@ -94,6 +197,24 @@ export function PatientStation({
           {intake}
         </div>
       ) : null}
+
+      {tab === "documents" ? (
+        <section className="mt-6 max-w-3xl space-y-4">
+          <div>
+            <p className="tl-overline">Medical Documents</p>
+            <h2 className="text-xl text-display">Prescriptions, Lab Sheets & Scans</h2>
+            <p className="mt-1 text-sm text-mist">
+              Upload physical records from past visits or external clinics. OCR extracts candidate text for your doctor to review. Content is never automatically merged into your medications without doctor verification.
+            </p>
+          </div>
+
+          <DocumentPipelinePanel
+            extracts={documentExtracts ?? []}
+            onUpload={handlePatientUpload}
+          />
+        </section>
+      ) : null}
+
 
       {tab === "symptoms" ? (
         <section className="mt-6 space-y-3">

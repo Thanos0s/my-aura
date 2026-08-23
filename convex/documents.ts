@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRole } from "./lib/rbac";
 
@@ -68,3 +68,56 @@ export const reviewExtract = mutation({
     return null;
   },
 });
+
+export const listPatientDocumentExtracts = query({
+  args: {
+    sessionUserId: v.id("users"),
+    patientId: v.optional(v.id("patients")),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("documentExtracts"),
+      documentId: v.id("documents"),
+      visitId: v.id("visits"),
+      rawText: v.string(),
+      structuredJson: v.string(),
+      confidence: v.number(),
+      reviewStatus: v.string(),
+      createdAt: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.sessionUserId);
+    if (!user || !user.active) throw new Error("Not authenticated");
+    const targetPatientId = args.patientId ?? user.patientId;
+    if (!targetPatientId) return [];
+
+    const visits = await ctx.db
+      .query("visits")
+      .withIndex("by_patient", (q) => q.eq("patientId", targetPatientId))
+      .collect();
+
+    const extracts: Array<{
+      _id: typeof visits[0]["_id"] extends any ? any : never;
+      documentId: any;
+      visitId: any;
+      rawText: string;
+      structuredJson: string;
+      confidence: number;
+      reviewStatus: "pending" | "confirmed" | "corrected" | "failed";
+      createdAt: number;
+    }> = [];
+
+
+    for (const v of visits) {
+      const visitExtracts = await ctx.db
+        .query("documentExtracts")
+        .withIndex("by_visit", (q) => q.eq("visitId", v._id))
+        .collect();
+      extracts.push(...visitExtracts);
+    }
+
+    return extracts.sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
