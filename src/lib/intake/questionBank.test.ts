@@ -78,37 +78,62 @@ describe("Chief-complaint question bank", () => {
     }
   });
 
-  it("completes after answering all general_other questions without asking systemic ROS questions", () => {
+  it("completes general_other after one history answer plus notes, without ROS", () => {
     let state = createInitialState("hi-IN");
     state = { ...state, phase: "socrates" };
 
-    // 1. Initial question
     state = applySlotAnswer(state, "socrates", "chiefComplaint", "शरीर में परेशानी");
     expect(state.matchedComplaintId).toBe("general_other");
 
-    // 2. Question 1 (character_location)
-    state = applySlotAnswer(state, "socrates", "character_location", "शरीर में परेशानी");
+    state = applySlotAnswer(
+      state,
+      "socrates",
+      "history_bundle",
+      "नहीं मैंने कोई दवाई ली नहीं है यह मेरे को कुछ दिनों से है अक्सर होता है जांच करानी है"
+    );
 
-    // 3. Question 2 (trigger)
-    state = applySlotAnswer(state, "socrates", "trigger", "नहीं मैंने कोई दवाई ली नहीं है");
-
-    // 4. Question 3 (onset)
-    state = applySlotAnswer(state, "socrates", "onset", "कुछ दिनों से");
-
-    // 5. Question 4 (medication)
-    state = applySlotAnswer(state, "socrates", "medication", "अक्सर होता है");
-
-    // 6. Question 5 (pattern)
-    state = applySlotAnswer(state, "socrates", "pattern", "बार-बार होता है");
-
-    // 7. Question 6 (notes)
-    state = applySlotAnswer(state, "socrates", "notes", "जांच करानी है");
-
-    // Intake must now be complete! No ROS questions!
     const follow = nextQuestion(state);
     expect(follow.kind).toBe("complete");
   });
 
+
+  it("covers duration and medicines from the full Hindi transcript, not sequential repeats", () => {
+    let state = createInitialState("hi-IN");
+    state = { ...state, phase: "socrates" };
+
+    state = applySlotAnswer(state, "socrates", "chiefComplaint", "शरीर में परेशानी");
+    const afterChief = nextQuestion(state);
+    expect(afterChief.kind).toBe("ask");
+    if (afterChief.kind === "ask") {
+      expect(afterChief.id).not.toBe("chiefComplaint");
+      expect(afterChief.id).not.toBe("character_location");
+    }
+
+    // Exact phrasing from kiosk STT: "I did not take medicine, this has been for a few days"
+    state = applySlotAnswer(
+      state,
+      "socrates",
+      afterChief.kind === "ask" ? afterChief.id : "trigger",
+      "नहीं मैंने कोई दवाई ली नहीं है यह मेरे को कुछ दिनों से है"
+    );
+
+    expect(state.complaintAnswers?.onset).toBeTruthy();
+    expect(state.complaintAnswers?.medication).toBeTruthy();
+
+    const afterFacts = nextQuestion(state);
+    expect(afterFacts.kind).toBe("ask");
+    if (afterFacts.kind === "ask") {
+      expect(["onset", "medication", "trigger", "character_location"]).not.toContain(afterFacts.id);
+    }
+
+    state = applySlotAnswer(state, "socrates", "pattern", "अक्सर होता है अक्सर होता है भैया अक्सर होता है");
+    const afterPattern = nextQuestion(state);
+    if (afterPattern.kind === "ask") {
+      expect(afterPattern.id).not.toBe("pattern");
+      expect(afterPattern.id).not.toBe("onset");
+      expect(afterPattern.id).not.toBe("medication");
+    }
+  });
 
   it("skips already-answered complaint fields using chat history (no repeat questions)", () => {
     let state = createInitialState("hi-IN");
