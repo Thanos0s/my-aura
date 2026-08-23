@@ -282,6 +282,10 @@ export const requestAppointment = mutation({
     practitionerUserId: v.id("users"),
     scheduledAt: v.number(),
     notes: v.string(),
+    patientPhone: v.optional(v.string()),
+    channel: v.optional(
+      v.union(v.literal("web"), v.literal("whatsapp"), v.literal("kiosk"))
+    ),
   },
   returns: v.id("appointments"),
   handler: async (ctx, args) => {
@@ -289,14 +293,97 @@ export const requestAppointment = mutation({
     if (!user.patientId) throw new Error("Patient record missing");
     const pract = await ctx.db.get(args.practitionerUserId);
     if (!pract || pract.role !== "practitioner") throw new Error("Practitioner not found");
+
+    if (args.patientPhone) {
+      await ctx.db.patch(user.patientId, { phoneNumber: args.patientPhone });
+    }
+
     return await ctx.db.insert("appointments", {
       patientId: user.patientId,
       practitionerUserId: pract._id,
       scheduledAt: args.scheduledAt,
       status: "requested",
       notes: args.notes,
+      channel: args.channel ?? "web",
+      patientPhone: args.patientPhone,
       createdAt: Date.now(),
     });
+  },
+});
+
+export const bookAppointmentFromWhatsApp = mutation({
+  args: {
+    phone: v.string(),
+    senderName: v.optional(v.string()),
+    messageText: v.string(),
+    scheduledAt: v.optional(v.number()),
+    practitionerUserId: v.optional(v.id("users")),
+  },
+  returns: v.object({
+    appointmentId: v.id("appointments"),
+    patientName: v.string(),
+    practitionerName: v.string(),
+    scheduledAt: v.number(),
+    status: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    // 1. Find or create patient by phone
+    let patient = await ctx.db
+      .query("patients")
+      .withIndex("by_phone", (q) => q.eq("phoneNumber", args.phone))
+      .first();
+
+    if (!patient) {
+      const patientId = await ctx.db.insert("patients", {
+        displayName: args.senderName || "WhatsApp Patient",
+        phoneNumber: args.phone,
+        languageCode: "en-IN",
+        lastKioskId: "whatsapp-bot",
+        createdAt: Date.now(),
+      });
+      patient = (await ctx.db.get(patientId))!;
+    }
+
+    // 2. Resolve practitioner (use requested or first active practitioner)
+    let pract = args.practitionerUserId ? await ctx.db.get(args.practitionerUserId) : null;
+    if (!pract) {
+      pract = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "practitioner"))
+        .filter((q) => q.eq(q.field("active"), true))
+        .first();
+    }
+    if (!pract) {
+      pract = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "practitioner"))
+        .first();
+    }
+    if (!pract) throw new Error("No practitioner available");
+
+    const scheduledAt =
+      args.scheduledAt && args.scheduledAt > Date.now()
+        ? args.scheduledAt
+        : Date.now() + 24 * 60 * 60 * 1000;
+
+    const appointmentId = await ctx.db.insert("appointments", {
+      patientId: patient._id,
+      practitionerUserId: pract._id,
+      scheduledAt,
+      status: "requested",
+      notes: `Booked via WhatsApp: "${args.messageText}"`,
+      channel: "whatsapp",
+      patientPhone: args.phone,
+      createdAt: Date.now(),
+    });
+
+    return {
+      appointmentId,
+      patientName: patient.displayName,
+      practitionerName: pract.displayName,
+      scheduledAt,
+      status: "requested",
+    };
   },
 });
 
@@ -313,59 +400,70 @@ export const setAppointmentStatus = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const row = await ctx.db.get(args.appointmentId);
     if (!row) throw new Error("Appointment not found");
-    if (row.practitionerUserId !== user._id) throw new Error("Unauthorized");
+    if (user.role === "practitioner" && row.practitionerUserId !== user._id) {
+      throw new Error("Unauthorized");
+    }
     await ctx.db.patch(args.appointmentId, { status: args.status });
     return null;
   },
 });
 
 export const listAppointments = query({
-  args: { ...session, patientId: v.optional(v.id("patients")) },
-  returns: v.array(
-    v.object({
-      _id: v.id("appointments"),
-      scheduledAt: v.number(),
-      status: v.string(),
-      notes: v.string(),
-      practitionerUserId: v.id("users"),
-    })
-  ),
+  args: { ...session, patientId: v.optional(v.union(v.id("patients"), v.string())) },
   handler: async (ctx, args) => {
     const user = await getUserSafely(ctx, args.sessionUserId);
     if (!user) return [];
 
+    let rows: any[] = [];
     if (user.role === "practitioner") {
-      const rows = await ctx.db
+      rows = await ctx.db
         .query("appointments")
         .withIndex("by_practitioner", (q) => q.eq("practitionerUserId", user._id))
         .take(80);
-      return rows.map((r) => ({
+    } else if (user.role === "admin") {
+      rows = await ctx.db
+        .query("appointments")
+        .order("desc")
+        .take(100);
+    } else {
+      const patientId = await resolvePatientScope(
+        ctx,
+        user,
+        args.patientId ? (ctx.db.normalizeId("patients", args.patientId) ?? undefined) : undefined
+      );
+      if (!patientId) return [];
+      rows = await ctx.db
+        .query("appointments")
+        .withIndex("by_patient", (q) => q.eq("patientId", patientId))
+        .take(40);
+    }
+
+    const results = [];
+    for (const r of rows) {
+      const [pat, pract] = await Promise.all([
+        ctx.db.get(r.patientId as Id<"patients">),
+        ctx.db.get(r.practitionerUserId as Id<"users">),
+      ]);
+
+      results.push({
         _id: r._id,
         scheduledAt: r.scheduledAt,
         status: r.status,
-        notes: r.notes,
+        notes: r.notes ?? "",
         practitionerUserId: r.practitionerUserId,
-      }));
+        channel: r.channel ?? "web",
+        patientPhone: r.patientPhone ?? pat?.phoneNumber ?? "",
+        patientName: pat?.displayName ?? "Patient",
+        practitionerName: pract?.displayName ?? "Practitioner",
+      });
     }
-    const patientId = await resolvePatientScope(ctx, user, args.patientId);
-    if (!patientId) return [];
-    const rows = await ctx.db
-      .query("appointments")
-      .withIndex("by_patient", (q) => q.eq("patientId", patientId))
-      .take(40);
-    return rows.map((r) => ({
-      _id: r._id,
-      scheduledAt: r.scheduledAt,
-
-      status: r.status,
-      notes: r.notes,
-      practitionerUserId: r.practitionerUserId,
-    }));
+    return results;
   },
 });
+
 
 export const savePractitionerNote = mutation({
   args: {

@@ -15,3 +15,5 @@ if (result.error) {
   console.error(result.error);
 }
 process.exit(result.status ?? 1);
+
+

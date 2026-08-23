@@ -70,6 +70,11 @@ export function PatientStation({
   const [toRole, setToRole] = useState<"practitioner" | "dietitian">("practitioner");
   const [slot, setSlot] = useState("");
   const [practId, setPractId] = useState<Id<"users"> | "">("");
+  const [phone, setPhone] = useState("");
+  const [sendWhatsAppAlert, setSendWhatsAppAlert] = useState(true);
+  const [bookingNotice, setBookingNotice] = useState("");
+
+
 
   async function handlePatientUpload(file: File, kind: DocumentKind) {
     const postUrlPromise = generateUploadUrl({}).then(async (postUrl) => {
@@ -736,47 +741,163 @@ export function PatientStation({
             <h2 className="text-xl font-bold text-slate-900">Book Follow-up Consultation</h2>
             <p className="text-xs text-slate-500">Request an in-clinic or telemedicine OPD slot with a practitioner.</p>
           </div>
-          <select
-            className="tl-input"
-            value={practId}
-            onChange={(e) => setPractId(e.target.value as Id<"users">)}
-          >
-            <option value="">Select Practitioner</option>
-            {practitioners?.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.displayName}
-              </option>
-            ))}
-          </select>
-          <input
-            className="tl-input"
-            type="datetime-local"
-            value={slot}
-            onChange={(e) => setSlot(e.target.value)}
-          />
+
+          <div className="space-y-3">
+            <label className="block">
+              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Select Doctor / Practitioner</span>
+              <select
+                className="tl-input mt-1"
+                value={practId}
+                onChange={(e) => setPractId(e.target.value as Id<"users">)}
+              >
+                <option value="">Select Practitioner</option>
+                {practitioners?.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Preferred Date & Time</span>
+              <input
+                className="tl-input mt-1"
+                type="datetime-local"
+                value={slot}
+                onChange={(e) => setSlot(e.target.value)}
+              />
+            </label>
+
+            <label className="block">
+              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">
+                WhatsApp Number for Instant Alerts 📲
+              </span>
+              <input
+                className="tl-input mt-1"
+                type="tel"
+                placeholder="+91 98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </label>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="wa-check"
+                type="checkbox"
+                checked={sendWhatsAppAlert}
+                onChange={(e) => setSendWhatsAppAlert(e.target.checked)}
+                className="rounded border-slate-300 text-[#1b343f] focus:ring-sky-500"
+              />
+              <label htmlFor="wa-check" className="text-xs font-medium text-slate-700 cursor-pointer">
+                Send appointment confirmation & reminders to my WhatsApp
+              </label>
+            </div>
+          </div>
+
           <button
-            className="btn-pulse px-4 py-2 text-xs font-semibold"
+            className="btn-pulse px-5 py-2.5 text-xs font-semibold"
             onClick={async () => {
               if (!practId || !slot) return;
-              await requestAppointment({
-                sessionUserId,
-                practitionerUserId: practId,
-                scheduledAt: new Date(slot).getTime(),
-                notes: "Follow-up",
-              });
+              try {
+                const selectedPractitioner = practitioners?.find((p) => p._id === practId);
+                const scheduledTime = new Date(slot).getTime();
+
+                await requestAppointment({
+                  sessionUserId,
+                  practitionerUserId: practId,
+                  scheduledAt: scheduledTime,
+                  notes: "Follow-up consultation",
+                  patientPhone: phone,
+                  channel: "web",
+                });
+
+                if (sendWhatsAppAlert && (phone || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_PHONE)) {
+                  fetch("/api/twilio/send-whatsapp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      to: phone,
+                      patientName: displayName,
+                      practitionerName: selectedPractitioner?.displayName || "Practitioner",
+                      scheduledAt: scheduledTime,
+                      status: "requested",
+                      notes: "Follow-up consultation",
+                    }),
+                  }).catch((err) => console.warn("WhatsApp alert trigger error:", err));
+                }
+
+                setBookingNotice("✅ Appointment requested successfully! WhatsApp alert dispatched.");
+                setTimeout(() => setBookingNotice(""), 6000);
+              } catch (err) {
+                setBookingNotice(err instanceof Error ? err.message : "Appointment booking failed");
+              }
             }}
           >
             Request Appointment Slot
           </button>
-          <ul className="mt-4 space-y-2">
-            {appointments?.map((a) => (
-              <li key={a._id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
-                {new Date(a.scheduledAt).toLocaleString()} · <span className="font-semibold uppercase text-sky-800">{a.status}</span>
-              </li>
-            ))}
-          </ul>
+
+          {bookingNotice && (
+            <div className="rounded-2xl bg-emerald-50 p-3 text-xs font-medium text-emerald-900 border border-emerald-200">
+              {bookingNotice}
+            </div>
+          )}
+
+          <div className="mt-6 pt-4 border-t border-slate-100">
+            <p className="font-mono text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Your Scheduled Appointments ({appointments?.length ?? 0})
+            </p>
+            <ul className="mt-3 space-y-2.5">
+              {appointments?.map((a) => (
+                <li
+                  key={a._id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">
+                        {new Date(a.scheduledAt).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${
+                          a.channel === "whatsapp"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {a.channel === "whatsapp" ? "📲 WhatsApp" : "🌐 Web Portal"}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px]">
+                      Doctor: <strong className="text-slate-700">{a.practitionerName || "Assigned Doctor"}</strong>
+                      {a.patientPhone ? ` · Alert to: ${a.patientPhone}` : ""}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`self-start sm:self-auto rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase ${
+                      a.status === "confirmed"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : a.status === "completed"
+                          ? "bg-slate-200 text-slate-700"
+                          : a.status === "cancelled"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {a.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       ) : null}
+
 
       {/* TAB 9: MESSAGES */}
       {tab === "messages" ? (

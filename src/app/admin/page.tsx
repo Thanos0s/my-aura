@@ -34,6 +34,8 @@ function AdminApp() {
   const kb = useQuery(api.adminOps.listKnowledge, sessionUserId ? { sessionUserId } : "skip");
   const issues = useQuery(api.adminOps.listIssues, sessionUserId ? { sessionUserId } : "skip");
   const audit = useQuery(api.adminOps.listAudit, sessionUserId ? { sessionUserId } : "skip");
+  const appointments = useQuery(api.clinical.listAppointments, sessionUserId ? { sessionUserId } : "skip");
+  const setStatus = useMutation(api.clinical.setAppointmentStatus);
   const setRole = useMutation(api.auth.setUserRole);
   const saveKb = useMutation(api.adminOps.saveKnowledge);
   const deleteKb = useMutation(api.adminOps.deleteKnowledge);
@@ -42,6 +44,9 @@ function AdminApp() {
   const [kbKind, setKbKind] = useState<"article" | "prompt">("article");
 
   if (!sessionUserId) return null;
+
+  const whatsappCount = appointments?.filter((a) => a.channel === "whatsapp").length ?? 0;
+  const webCount = appointments?.filter((a) => a.channel !== "whatsapp").length ?? 0;
 
   return (
     <main className="mx-auto max-w-[1300px] space-y-8 pb-16">
@@ -64,12 +69,112 @@ function AdminApp() {
           <Stat label="Dietitians" value={sys?.dietitians ?? 0} />
           <Stat label="Documents OCR" value={sys?.documents ?? 0} />
           <Stat label="Total Visits" value={stats?.total ?? sys?.visits ?? 0} />
-          <Stat label="Awaiting Doctor" value={stats?.awaitingDoctor ?? 0} />
-          <Stat label="Approved Visits" value={stats?.approved ?? 0} />
+          <Stat label="Appointments" value={appointments?.length ?? 0} />
+          <Stat label="WhatsApp Bookings" value={whatsappCount} />
+          <Stat label="Web Bookings" value={webCount} />
           <Stat label="Open Issues" value={sys?.openIssues ?? 0} />
           <Stat label="ABHA Consent" value={`${Math.round((stats?.abhaConsentRate ?? 0) * 100)}%`} />
         </div>
       </section>
+
+      {/* Real-time Appointments & WhatsApp Consultation Desk */}
+      <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Appointments & Inbound Consultations</h2>
+            <p className="text-xs text-slate-500">
+              Live queue of appointments booked via Web Portal and Twilio WhatsApp Bot.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-3 py-1 font-mono text-[10px] font-bold text-emerald-800">
+            {appointments?.length ?? 0} Total Scheduled
+          </span>
+        </div>
+
+        {appointments && appointments.length === 0 ? (
+          <p className="text-xs text-slate-400 py-3">No appointments scheduled yet.</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {appointments?.map((a) => (
+              <li
+                key={a._id}
+                className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm">
+                      {a.patientName || "Patient"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${
+                        a.channel === "whatsapp"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          : "bg-sky-100 text-sky-800"
+                      }`}
+                    >
+                      {a.channel === "whatsapp" ? "📲 WhatsApp" : "🌐 Web Portal"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
+                        a.status === "confirmed"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : a.status === "completed"
+                            ? "bg-slate-200 text-slate-700"
+                            : a.status === "cancelled"
+                              ? "bg-rose-100 text-rose-800"
+                              : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {a.status}
+                    </span>
+                  </div>
+
+                  <p className="text-slate-600 text-xs">
+                    📅{" "}
+                    <strong>
+                      {new Date(a.scheduledAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </strong>{" "}
+                    · Doctor: <strong>{a.practitionerName}</strong>
+                    {a.patientPhone ? ` · Phone: ${a.patientPhone}` : ""}
+                  </p>
+                  {a.notes && <p className="text-[11px] text-slate-400 italic font-mono">{a.notes}</p>}
+                </div>
+
+                <div className="flex items-center gap-1.5 self-start md:self-auto">
+                  {a.status === "requested" && (
+                    <button
+                      className="rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800"
+                      onClick={() => void setStatus({ sessionUserId, appointmentId: a._id, status: "confirmed" })}
+                    >
+                      ✓ Confirm
+                    </button>
+                  )}
+                  {a.status !== "completed" && a.status !== "cancelled" && (
+                    <button
+                      className="rounded-full bg-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-300"
+                      onClick={() => void setStatus({ sessionUserId, appointmentId: a._id, status: "completed" })}
+                    >
+                      Mark Completed
+                    </button>
+                  )}
+                  {a.status !== "cancelled" && (
+                    <button
+                      className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                      onClick={() => void setStatus({ sessionUserId, appointmentId: a._id, status: "cancelled" })}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
 
       <section className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-4">
         <h2 className="text-lg font-bold text-slate-900">Users, Roles & Access Control</h2>

@@ -11,6 +11,7 @@ const role = v.union(
 export default defineSchema({
   patients: defineTable({
     displayName: v.string(),
+    phoneNumber: v.optional(v.string()),
     abhaId: v.optional(v.string()),
     languageCode: v.string(),
     lastKioskId: v.optional(v.string()),
@@ -18,7 +19,9 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_abha", ["abhaId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_phone", ["phoneNumber"]),
+
 
   users: defineTable({
     email: v.string(),
@@ -221,10 +224,15 @@ export default defineSchema({
       v.literal("cancelled")
     ),
     notes: v.string(),
+    channel: v.optional(
+      v.union(v.literal("web"), v.literal("whatsapp"), v.literal("kiosk"))
+    ),
+    patientPhone: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_patient", ["patientId"])
     .index("by_practitioner", ["practitionerUserId"]),
+
 
   messages: defineTable({
     patientId: v.id("patients"),
