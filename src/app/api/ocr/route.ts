@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import Tesseract from "tesseract.js";
 import { buildDocumentExtractMeta, type DocumentKind } from "@/lib/documents/metadata";
+import { buildClinicalExtract } from "@/lib/documents/clinicalExtract";
 
 function asKind(value: FormDataEntryValue | null): DocumentKind {
-  if (value === "prescription" || value === "lab") return value;
+  if (value === "prescription" || value === "lab" || value === "scan") return value;
   if (value === "discharge") return "scan";
   return "scan";
 }
@@ -254,21 +255,44 @@ export async function POST(request: Request) {
     }
 
     const meta = buildDocumentExtractMeta({ kind, rawText: text, confidence });
+    const clinical = await buildClinicalExtract({ rawText: text, confidence, kind });
+    const structured = {
+      ...(typeof aiStructured === "object" && aiStructured ? aiStructured : meta),
+      clinical,
+    };
+
+    if (!clinical.valid_medical_document) {
+      return NextResponse.json({
+        ...clinical,
+        text,
+        confidence,
+        engine,
+        kind: meta.kind,
+        reviewRequired: true,
+        handwritingLikely: meta.handwritingLikely,
+        structured,
+        aiExtracted: aiStructured !== null,
+        note: clinical.error_message,
+      });
+    }
 
     return NextResponse.json({
+      ...clinical,
       text,
       confidence: meta.confidence,
       engine,
       kind: meta.kind,
-      reviewRequired: meta.reviewRequired,
+      reviewRequired: meta.reviewRequired || clinical.needs_human_review,
       handwritingLikely: meta.handwritingLikely,
-      structured: aiStructured ?? meta,
+      structured,
       aiExtracted: aiStructured !== null,
       note: meta.handwritingLikely
         ? "Low confidence — likely handwriting or poor print. Doctor must confirm. Not merged into medicines/allergies."
-        : aiStructured
-        ? `AI-extracted structured ${rawKind ?? kind} data. Doctor confirms before clinical merge.`
-        : "Printed-text OCR attached to the visit. Doctor confirms before any clinical merge.",
+        : clinical.needs_human_review
+          ? "Clinical fields extracted. Doctor should confirm medicines before merge."
+          : aiStructured
+            ? `AI-extracted structured ${rawKind ?? kind} data. Doctor confirms before clinical merge.`
+            : "Printed-text OCR attached to the visit. Doctor confirms before any clinical merge.",
     });
   } catch {
     const meta = buildDocumentExtractMeta({ kind, rawText: "", confidence: 0, failed: true });

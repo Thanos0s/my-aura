@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:ocr": "vitest run --config vitest.scripts.config.ts scripts/test_ocr_validation.ts",
     "test:watch": "vitest",
     "convex:dev": "convex dev",
     "seed:visit": "node scripts/seed-visit.mjs"

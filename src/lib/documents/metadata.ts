@@ -154,7 +154,14 @@ export function extractBlocksApprove(extract: {
   if (extract.confidence < 0.7) return true;
   if (!extract.structuredJson) return false;
   try {
-    const parsed = JSON.parse(extract.structuredJson) as { reviewRequired?: boolean };
+    const parsed = JSON.parse(extract.structuredJson) as {
+      reviewRequired?: boolean;
+      clinical?: { valid_medical_document?: boolean };
+      valid_medical_document?: boolean;
+    };
+    if (parsed.valid_medical_document === false || parsed.clinical?.valid_medical_document === false) {
+      return true;
+    }
     return parsed.reviewRequired === true;
   } catch {
     return false;
