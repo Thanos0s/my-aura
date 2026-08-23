@@ -3,17 +3,18 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { SessionSnapshot } from "@/lib/auth/session";
-import { readSession } from "@/lib/auth/session";
+import Link from "next/link";
+import { readSession, SESSION_EVENT } from "@/lib/auth/session";
 
 export function useAuraSession() {
   const [session, setSession] = useState<SessionSnapshot | null>(null);
   useEffect(() => {
     const sync = () => setSession(readSession());
     sync();
-    window.addEventListener("aura-session", sync);
+    window.addEventListener(SESSION_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener("aura-session", sync);
+      window.removeEventListener(SESSION_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
   }, []);
@@ -36,8 +37,19 @@ export function RoleGate({
         <p className="tl-overline">Auth</p>
         <h1 className="mt-2 text-2xl">{label}</h1>
         <p className="mt-3 text-body">
-          Sign in from the home page. Demo PIN is <code>1234</code> after seeding accounts.
+          You are not signed in. Open a login gate, then this station will load your live data.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/login/patient" className="btn-pulse px-4 py-2 text-sm">
+            Patient login
+          </Link>
+          <Link href="/login/doctor" className="btn-ghost px-4 py-2 text-sm">
+            Practitioner login
+          </Link>
+          <Link href="/login/admin" className="btn-ghost px-4 py-2 text-sm">
+            Admin login
+          </Link>
+        </div>
       </main>
     );
   }

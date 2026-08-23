@@ -21,7 +21,7 @@ Copy `NEXT_PUBLIC_CONVEX_URL` into `.env.local`. Optional:
 
 ```
 SARVAM_API_KEY=
-SARVAM_LLM_MODEL=sarvam-m
+SARVAM_LLM_MODEL=sarvam-105b
 ```
 
 Without a Sarvam key, the kiosk uses **typed chips** and a small heuristic extractor. Without Convex, the kiosk still runs **locally**; logged-in stations need Convex.

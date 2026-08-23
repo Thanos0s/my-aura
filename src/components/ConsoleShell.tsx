@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { convexConfigured } from "@/app/providers";
 import { navForRole } from "@/lib/auth/access";
 import { isPublicPath } from "@/lib/auth/siteFlow";
 import { clearSession } from "@/lib/auth/session";
 import { signOutFirebase } from "@/lib/firebase/client";
 import { useAuraSession } from "@/components/useAuraSession";
+import { SyncBadge } from "@/components/SyncBadge";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -26,7 +26,6 @@ const PUBLIC_LINKS = [
 export function ConsoleShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const live = convexConfigured();
   const session = useAuraSession();
   const nav = navForRole(session?.role ?? null);
   const publicShell = isPublicPath(pathname);
@@ -56,16 +55,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             </nav>
           ) : null}
           <div className="flex items-center gap-3 text-right">
-            <span className={`tl-tag ${live ? "status-live border-pulse text-pulse" : ""}`}>
-              {live ? "Live sync" : "Local demo"}
-            </span>
+            <SyncBadge />
             {session ? (
               <button
                 className="btn-ghost px-2 py-1 text-[10px]"
                 onClick={() => {
                   void signOutFirebase();
                   clearSession();
-                  window.dispatchEvent(new Event("aura-session"));
                   router.push("/");
                 }}
               >

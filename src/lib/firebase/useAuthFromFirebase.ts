@@ -1,33 +1,42 @@
 "use client";
 
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
 
 export function useAuthFromFirebase() {
   const enabled = isFirebaseConfigured();
-  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(enabled);
 
   useEffect(() => {
     if (!enabled) {
       setIsLoading(false);
+      setIsAuthenticated(false);
       return;
     }
     return onAuthStateChanged(getFirebaseAuth(), (next) => {
-      setUser(next);
+      setIsAuthenticated(next != null);
       setIsLoading(false);
     });
   }, [enabled]);
 
-  return {
-    isLoading,
-    isAuthenticated: user != null,
-    fetchAccessToken: async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      if (!enabled) return null;
-      const current = getFirebaseAuth().currentUser ?? user;
+  const fetchAccessToken = useCallback(
+    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      if (!isFirebaseConfigured()) return null;
+      const current = getFirebaseAuth().currentUser;
       if (!current) return null;
       return await current.getIdToken(forceRefreshToken);
     },
-  };
+    []
+  );
+
+  return useMemo(
+    () => ({
+      isLoading,
+      isAuthenticated,
+      fetchAccessToken,
+    }),
+    [isLoading, isAuthenticated, fetchAccessToken]
+  );
 }

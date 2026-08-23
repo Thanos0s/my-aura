@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       "api-subscription-key": apiKey,
     },
     body: JSON.stringify({
-      model: process.env.SARVAM_LLM_MODEL ?? "sarvam-m",
+      model: process.env.SARVAM_LLM_MODEL ?? "sarvam-105b",
       messages: [
         {
           role: "system",

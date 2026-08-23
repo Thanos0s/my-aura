@@ -9,6 +9,8 @@ import {
   SESSION_USER_KEY,
 } from "@/lib/auth/access";
 
+export const SESSION_EVENT = "aura-session";
+
 export type SessionSnapshot = {
   userId: string;
   role: Role;
@@ -16,6 +18,11 @@ export type SessionSnapshot = {
   displayName: string;
   patientId: string | null;
 };
+
+export function emitSessionChange() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
 
 export function readSession(): SessionSnapshot | null {
   if (typeof window === "undefined") return null;
@@ -40,6 +47,7 @@ export function writeSession(session: SessionSnapshot) {
   localStorage.setItem(SESSION_NAME_KEY, session.displayName);
   if (session.patientId) localStorage.setItem(SESSION_PATIENT_KEY, session.patientId);
   else localStorage.removeItem(SESSION_PATIENT_KEY);
+  emitSessionChange();
 }
 
 export function clearSession() {
@@ -48,4 +56,5 @@ export function clearSession() {
   localStorage.removeItem(SESSION_EMAIL_KEY);
   localStorage.removeItem(SESSION_NAME_KEY);
   localStorage.removeItem(SESSION_PATIENT_KEY);
+  emitSessionChange();
 }
