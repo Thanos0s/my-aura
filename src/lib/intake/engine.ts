@@ -3,6 +3,21 @@ import {
   getRedFlagTranslation,
   getYesNoTranslation,
 } from "./translations";
+import {
+  matchChiefComplaint,
+  QUESTION_BANK,
+  buildDoctorClinicalSummary,
+  type ComplaintDefinition,
+  type ComplaintQuestion,
+} from "./questionBank";
+
+export {
+  matchChiefComplaint,
+  QUESTION_BANK,
+  buildDoctorClinicalSummary,
+  type ComplaintDefinition,
+  type ComplaintQuestion,
+};
 
 export type SlotStatus =
   | "empty"
@@ -103,6 +118,9 @@ export type IntakeState = {
   answeredBy: AnswerSource;
   pathway: "allopathic" | "ayush";
   consent: ConsentMap;
+  matchedComplaintId?: string;
+  complaintQuestionIndex?: number;
+  complaintAnswers?: Record<string, string>;
   redFlagIndex: number;
   redFlags: Record<string, boolean | null>;
   redFlagEvents: RedFlagEvent[];
@@ -333,6 +351,9 @@ export function createInitialState(languageCode = "en-IN"): IntakeState {
       shareAbha: false,
       retainAfterEncounter: true,
     },
+    matchedComplaintId: undefined,
+    complaintQuestionIndex: 0,
+    complaintAnswers: {},
     redFlagIndex: 0,
     redFlags: Object.fromEntries(RED_FLAG_QUESTIONS.map((q) => [q.id, null])),
     redFlagEvents: [],
@@ -346,7 +367,8 @@ export function createInitialState(languageCode = "en-IN"): IntakeState {
   };
 }
 
-export function isFilled(slot: Slot): boolean {
+export function isFilled(slot?: Slot): boolean {
+  if (!slot) return false;
   return slot.status !== "empty" && (slot.value.trim().length > 0 || slot.status === "clinician_to_assess");
 }
 
@@ -363,12 +385,12 @@ export function clinicalHistoryProgress(state: IntakeState): { filled: number; t
 }
 
 const RED_FLAG_TEXT_HINTS: Array<{ id: string; pattern: RegExp }> = [
-  { id: "chest_pain", pattern: /\b(chest pain|chest pressure|pressure in (my |the )?chest)\b/i },
-  { id: "breathing", pattern: /\b(can'?t breathe|cannot breathe|difficulty breathing|short(ness)? of breath at rest)\b/i },
-  { id: "bleeding", pattern: /\b(severe bleeding|uncontrolled bleeding)\b/i },
-  { id: "stroke", pattern: /\b(slurred speech|sudden weakness|sudden numbness)\b/i },
-  { id: "abdomen", pattern: /\bsevere abdominal pain\b/i },
-  { id: "self_harm", pattern: /\b(kill myself|suicide|harm myself|harming yourself|harming myself)\b/i },
+  { id: "chest_pain", pattern: /\b(chest pain|chest pressure|pressure in (my |the )?chest|सीने में दर्द|छाती में दर्द)\b/i },
+  { id: "breathing", pattern: /\b(can'?t breathe|cannot breathe|difficulty breathing|short(ness)? of breath at rest|सांस फूलना|सांस लेने में दिक्कत)\b/i },
+  { id: "bleeding", pattern: /\b(severe bleeding|uncontrolled bleeding|खून बहना)\b/i },
+  { id: "stroke", pattern: /\b(slurred speech|sudden weakness|sudden numbness|लकवा|आधा अंग सुन्न)\b/i },
+  { id: "abdomen", pattern: /\b(severe abdominal pain|असहनीय पेट दर्द)\b/i },
+  { id: "self_harm", pattern: /\b(kill myself|suicide|harm myself|harming yourself|harming myself|आत्महत्या)\b/i },
 ];
 
 export function detectRedFlagInterrupt(text: string): string | null {
@@ -385,7 +407,7 @@ function escalateNow(state: IntakeState, questionId: string): IntakeState {
     ...state,
     phase: "escalated",
     redFlags: { ...state.redFlags, [questionId]: true },
-    redFlagEvents: [...state.redFlagEvents, { questionId, at: 0, escalated: true }],
+    redFlagEvents: [...state.redFlagEvents, { questionId, at: Date.now(), escalated: true }],
   };
 }
 
@@ -394,8 +416,8 @@ export function normalizeDashavidha(
 ): Record<DashavidhaKey, Slot> {
   const base = mapFrom(DASHAVIDHA_ORDER);
   if (!raw) return base;
-  const agni = raw.agni ?? raw.aharaShakti;
-  const satva = raw.satva ?? raw.sattva;
+  const agni = raw.agni ?? (raw as Record<string, Slot>).aharaShakti;
+  const satva = raw.satva ?? (raw as Record<string, Slot>).sattva;
   for (const key of DASHAVIDHA_ORDER) {
     if (key === "agni" && agni) base.agni = agni;
     else if (key === "satva" && satva) base.satva = satva;
@@ -405,8 +427,9 @@ export function normalizeDashavidha(
 }
 
 export function nextQuestion(state: IntakeState): Prompt {
-
   const lang = state.languageCode || "en-IN";
+  const isHi = lang.startsWith("hi");
+
   if (state.phase === "escalated") {
     const last = state.redFlagEvents[state.redFlagEvents.length - 1];
     return { kind: "escalated", reason: last?.questionId ?? "red_flag" };
@@ -414,21 +437,67 @@ export function nextQuestion(state: IntakeState): Prompt {
   if (state.phase === "complete") {
     return { kind: "complete" };
   }
+
+  // ─── 1. SOCRATES PHASE ─────────────────────────────────────────────────────
   if (state.phase === "socrates") {
-    for (const key of SOCRATES_ORDER) {
-      if (!isFilled(state.socrates[key])) {
-        const p = getPromptTranslation(key, lang);
-        return {
-          kind: "ask",
-          group: "socrates",
-          id: key,
-          text: p.text,
-          chips: p.chips,
-        };
+    // If not filled, ask chief complaint first
+    if (!isFilled(state.socrates.chiefComplaint)) {
+      const p = getPromptTranslation("chiefComplaint", lang);
+      return {
+        kind: "ask",
+        group: "socrates",
+        id: "chiefComplaint",
+        text: p.text,
+        chips: isHi
+          ? ["पेट दर्द", "सिरदर्द", "बुखार", "खांसी और जुकाम", "कमर दर्द", "जोड़ों का दर्द", "दस्त", "उल्टी / जी मिचलाना", "सीने में दर्द", "चक्कर / कमजोरी"]
+          : ["Stomach ache", "Headache", "Fever", "Cough & Cold", "Back pain", "Joint / Body pain", "Diarrhea", "Vomiting", "Chest pain", "Dizziness / Weakness"],
+      };
+    }
+
+    // If a specific matched complaint is in progress
+    if (state.matchedComplaintId) {
+      const complaint =
+        QUESTION_BANK.find((c) => c.id === state.matchedComplaintId) ||
+        matchChiefComplaint(state.socrates.chiefComplaint.value);
+
+      const qIndex = state.complaintQuestionIndex ?? 0;
+      if (qIndex < complaint.questions.length) {
+        const q = complaint.questions[qIndex];
+        if (q) {
+          return {
+            kind: "ask",
+            group: "socrates",
+            id: q.field,
+            text: isHi ? q.hi : q.en,
+            chips: isHi ? q.chips_hi : q.chips_en,
+          };
+        }
+      }
+
+      // If complaint was red flag and all 3 emergency questions asked -> escalate!
+      if (complaint.redFlag) {
+        return { kind: "escalated", reason: complaint.id };
+      }
+    } else {
+      // Standard SOCRATES sequence
+      for (const key of SOCRATES_ORDER) {
+        if (!isFilled(state.socrates[key])) {
+          const p = getPromptTranslation(key, lang);
+          return {
+            kind: "ask",
+            group: "socrates",
+            id: key,
+            text: p.text,
+            chips: p.chips,
+          };
+        }
       }
     }
+
     return nextQuestion({ ...state, phase: "ros" });
   }
+
+  // ─── 2. ROS (Clinical Review of Systems) ───────────────────────────────────
   if (state.phase === "ros") {
     for (const key of ROS_ORDER) {
       if (!isFilled(state.ros[key])) {
@@ -441,6 +510,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     }
     return nextQuestion({ ...state, phase: "aharaVihara" });
   }
+
+  // ─── 3. AYUSH DASHAVIDHA ASSESSMENT ────────────────────────────────────────
   if (state.phase === "dashavidha") {
     const dash = normalizeDashavidha(state.dashavidha);
     for (const key of DASHAVIDHA_ORDER) {
@@ -451,6 +522,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     }
     return nextQuestion({ ...state, phase: "aharaVihara" });
   }
+
+  // ─── 4. AHARA-VIHARA (LIFESTYLE) ───────────────────────────────────────────
   if (state.phase === "aharaVihara") {
     const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
     for (const key of AHARA_VIHARA_ORDER) {
@@ -461,6 +534,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     }
     return nextQuestion({ ...state, phase: "history" });
   }
+
+  // ─── 5. HISTORY ────────────────────────────────────────────────────────────
   if (state.phase === "history") {
     for (const key of HISTORY_ORDER) {
       if (!isFilled(state.history[key])) {
@@ -470,6 +545,8 @@ export function nextQuestion(state: IntakeState): Prompt {
     }
     return nextQuestion({ ...state, phase: "redFlag", redFlagIndex: 0 });
   }
+
+  // ─── 6. RED FLAG SCREENING ─────────────────────────────────────────────────
   if (state.phase === "redFlag") {
     const q = RED_FLAG_QUESTIONS[state.redFlagIndex];
     if (!q) {
@@ -479,12 +556,13 @@ export function nextQuestion(state: IntakeState): Prompt {
     const ynChips = getYesNoTranslation(lang);
     return { kind: "ask", group: "redFlag", id: q.id, text: rfText, yesNo: true, chips: ynChips };
   }
+
   if (state.phase === "documents" || state.phase === "recap") {
     return { kind: "complete" };
   }
+
   return { kind: "ask", group: "meta", id: state.phase, text: "Continue." };
 }
-
 
 export function applyYesNo(state: IntakeState, questionId: string, yes: boolean): IntakeState {
   if (state.phase !== "redFlag") return state;
@@ -500,7 +578,6 @@ export function applyYesNo(state: IntakeState, questionId: string, yes: boolean)
     phase: nextIndex >= RED_FLAG_QUESTIONS.length ? "documents" : "redFlag",
   };
 }
-
 
 function fillSlot(source: AnswerSource, value: string, confidence: number): Slot {
   return {
@@ -534,12 +611,73 @@ export function applySlotAnswer(
   }
 
   if (group === "socrates") {
-    const key = id as SocratesKey;
+    // 1. Initial Chief complaint
+    if (id === "chiefComplaint" || !isFilled(state.socrates.chiefComplaint)) {
+      const matched = matchChiefComplaint(value);
+      return {
+        ...state,
+        matchedComplaintId: matched.id,
+        complaintQuestionIndex: 0,
+        complaintAnswers: {},
+        socrates: { ...state.socrates, chiefComplaint: fillSlot(source, value, 1) },
+      };
+    }
+
+    // 2. Answering complaint question or standard SOCRATES slot
+    const answers = { ...(state.complaintAnswers || {}), [id]: value };
+    const qIndex = state.complaintQuestionIndex ?? 0;
+    const nextQIndex = qIndex + 1;
+
+    const updatedSocrates = { ...state.socrates };
+    const updatedHistory = { ...state.history };
+
+    // Field mapping
+    if (id === "character_location") {
+      updatedSocrates.site = fillSlot(source, value, 1);
+      updatedSocrates.character = fillSlot(source, value, 1);
+    } else if (id === "trigger") {
+      updatedSocrates.exacerbatingRelieving = fillSlot(source, value, 1);
+    } else if (id === "onset") {
+      updatedSocrates.onset = fillSlot(source, value, 1);
+    } else if (id === "medication") {
+      updatedHistory.currentMedicines = fillSlot(source, value, 1);
+    } else if (id === "pattern") {
+      updatedSocrates.timing = fillSlot(source, value, 1);
+    } else if (id === "notes") {
+      updatedSocrates.associated = fillSlot(source, value, 1);
+    } else if (id === "severity_now") {
+      updatedSocrates.severity = fillSlot(source, value, 1);
+    }
+
+    if (id in updatedSocrates) {
+      updatedSocrates[id as SocratesKey] = fillSlot(source, value, 1);
+    }
+
+    if (state.matchedComplaintId) {
+      const complaint = QUESTION_BANK.find((c) => c.id === state.matchedComplaintId);
+      if (complaint && complaint.redFlag && nextQIndex >= complaint.questions.length) {
+        return escalateNow(
+          {
+            ...state,
+            complaintQuestionIndex: nextQIndex,
+            complaintAnswers: answers,
+            socrates: updatedSocrates,
+            history: updatedHistory,
+          },
+          complaint.id
+        );
+      }
+    }
+
     return {
       ...state,
-      socrates: { ...state.socrates, [key]: fillSlot(source, value, 1) },
+      complaintQuestionIndex: nextQIndex,
+      complaintAnswers: answers,
+      socrates: updatedSocrates,
+      history: updatedHistory,
     };
   }
+
   if (group === "history") {
     const key = id as HistoryKey;
     return {
@@ -596,6 +734,9 @@ export function canCompleteIntake(state: IntakeState): { ok: boolean; reasons: s
   }
   if (!state.patientRecapConfirmed) {
     reasons.push("patient has not confirmed the recap");
+  }
+  if (!isFilled(state.socrates.chiefComplaint)) {
+    reasons.push("chief complaint must be recorded");
   }
   if (!isFilled(state.history.currentMedicines)) {
     reasons.push("current medicines must be filled (or none known)");
@@ -654,4 +795,3 @@ export function plainLanguageRecap(state: IntakeState): string {
 
   return `Chief Complaint: ${cc}.${site ? ` Location: ${site}.` : ""}${onset ? ` Onset: ${onset}.` : ""}${character ? ` Character: ${character}.` : ""}${radiation ? ` Radiation: ${radiation}.` : ""}${severity ? ` Severity: ${severity}/10.` : ""} Current Medicines: ${meds}. Allergies: ${allergy}. Ahara-Vihara (Lifestyle): Meals: ${meals}; Diet: ${diet}; Sleep: ${sleep}; Water: ${water}; Substances: ${tea}.${ayushSummary} [ABHA Linked | Encounter Verified]`;
 }
-

@@ -6,25 +6,19 @@ import {
   applySlotAnswer,
   applyYesNo,
   canCompleteIntake,
-
   createInitialState,
   nextQuestion,
   plainLanguageRecap,
   DASHAVIDHA_FACTORS,
   DASHAVIDHA_ORDER,
-  HISTORY_ORDER,
-  RED_FLAG_QUESTIONS,
-  ROS_ORDER,
   SOCRATES_ORDER,
   AHARA_VIHARA_ORDER,
   isFilled,
   normalizeDashavidha,
+  QUESTION_BANK,
   type IntakeState,
 } from "@/lib/intake/engine";
-import {
-  getPromptTranslation,
-  getRedFlagTranslation,
-} from "@/lib/intake/translations";
+import { getPromptTranslation } from "@/lib/intake/translations";
 import { detectSarvamLanguageCode, SARVAM_LANGUAGES } from "@/lib/sarvam/languages";
 
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
@@ -168,26 +162,44 @@ export function KioskWizard({
   const conversationHistory = useMemo(() => {
     const list: Array<{ id: string; question: string; answer: string }> = [];
     const lang = state.languageCode || "en-IN";
+    const isHi = lang.startsWith("hi");
 
-    for (const key of SOCRATES_ORDER) {
-      const slot = state.socrates[key];
-      if (isFilled(slot)) {
-        list.push({
-          id: `socrates-${key}`,
-          question: getPromptTranslation(key, lang).text,
-          answer: slot.value,
-        });
-      }
+    // 1. Opening Chief Complaint Question & Answer
+    if (isFilled(state.socrates.chiefComplaint)) {
+      list.push({
+        id: "socrates-chiefComplaint",
+        question: isHi ? "आज आपको क्या मुख्य समस्या या तकलीफ है?" : "What is the main problem that brought you here today?",
+        answer: state.socrates.chiefComplaint.value,
+      });
     }
 
-    for (const key of ROS_ORDER) {
-      const slot = state.ros[key];
-      if (isFilled(slot)) {
-        list.push({
-          id: `ros-${key}`,
-          question: getPromptTranslation(key, lang).text,
-          answer: slot.value,
-        });
+    if (state.matchedComplaintId && state.complaintAnswers) {
+      const complaint = QUESTION_BANK.find((c) => c.id === state.matchedComplaintId);
+      if (complaint) {
+        for (const q of complaint.questions) {
+          const ans = state.complaintAnswers[q.field];
+          if (ans) {
+            list.push({
+              id: `complaint-${q.id}`,
+              question: isHi ? q.hi : q.en,
+              answer: ans,
+            });
+          }
+        }
+      }
+    } else {
+
+      // Fallback to legacy slots if not matched
+      for (const key of SOCRATES_ORDER) {
+        if (key === "chiefComplaint") continue;
+        const slot = state.socrates[key];
+        if (isFilled(slot)) {
+          list.push({
+            id: `socrates-${key}`,
+            question: getPromptTranslation(key, lang).text,
+            answer: slot.value,
+          });
+        }
       }
     }
 
@@ -218,36 +230,9 @@ export function KioskWizard({
       }
     }
 
-    for (const key of HISTORY_ORDER) {
-      const slot = state.history[key];
-      if (isFilled(slot)) {
-        list.push({
-          id: `history-${key}`,
-          question: getPromptTranslation(key, lang).text,
-          answer: slot.value,
-        });
-      }
-    }
-
-    for (let i = 0; i < state.redFlagIndex; i++) {
-      const q = RED_FLAG_QUESTIONS[i];
-      if (q && state.redFlags[q.id] !== null) {
-        list.push({
-          id: `rf-${q.id}`,
-          question: getRedFlagTranslation(q.id, lang),
-          answer: state.redFlags[q.id]
-            ? lang.startsWith("hi")
-              ? "हाँ"
-              : "Yes"
-            : lang.startsWith("hi")
-            ? "नहीं"
-            : "No",
-        });
-      }
-    }
-
     return list;
   }, [state]);
+
 
   const clinical = !["consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
 
