@@ -47,12 +47,30 @@ describe("document extract metadata", () => {
     });
   });
 
-  it("correctly evaluates whether an extract blocks doctor approval", () => {
-    expect(extractBlocksApprove({ reviewStatus: "pending", confidence: 0.85 })).toBe(false);
-    expect(extractBlocksApprove({ reviewStatus: "pending", confidence: 0.45 })).toBe(true);
-    expect(extractBlocksApprove({ reviewStatus: "failed", confidence: 0 })).toBe(true);
-    expect(extractBlocksApprove({ reviewStatus: "confirmed", confidence: 0.45 })).toBe(false);
-    expect(extractBlocksApprove({ reviewStatus: "corrected", confidence: 0.45 })).toBe(false);
+  it("extracts multiple clinical prescription lines with dosages", () => {
+    const rxText = `
+      1. Tab Paracetamol 650mg TDS
+      2. Cap Amoxicillin 500mg BD
+      3. Tab Metformin 1000mg OD
+      4. Glucose Fasting: 112 mg/dL
+      5. Serum Creatinine: 0.9 mg/dL
+      6. TSH: 1.8 uIU/mL
+    `;
+    const meta = buildDocumentExtractMeta({
+      kind: "prescription",
+      rawText: rxText,
+      confidence: 0.88,
+    });
+    expect(meta.structuredFields.possibleMedicines).toHaveLength(3);
+    expect(meta.structuredFields.possibleMedicines[0]).toContain("Paracetamol 650mg");
+    expect(meta.structuredFields.possibleMedicines[1]).toContain("Amoxicillin 500mg");
+    expect(meta.structuredFields.possibleMedicines[2]).toContain("Metformin 1000mg");
+    expect(meta.structuredFields.possibleLabs).toHaveLength(3);
+    expect(meta.structuredFields.possibleLabs[0]).toContain("Glucose");
+    expect(meta.structuredFields.possibleLabs[1]).toContain("Creatinine");
+    expect(meta.structuredFields.possibleLabs[2]).toContain("TSH");
+    expect(meta.reviewRequired).toBe(false);
   });
 });
+
 

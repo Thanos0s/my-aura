@@ -45,27 +45,78 @@ export type DocumentExtractMeta = {
 };
 
 
-const MEDICINE_HINTS = [
-  "mg",
+const MEDICINE_KEYWORDS = [
   "tablet",
   "tab",
   "capsule",
+  "cap",
   "syrup",
+  "syr",
+  "ointment",
+  "cream",
+  "injection",
+  "inj",
   "metformin",
   "paracetamol",
   "amoxicillin",
+  "pantoprazole",
+  "omeprazole",
+  "atorvastatin",
+  "azithromycin",
   "insulin",
 ];
 
-const LAB_HINTS = ["hb", "hemoglobin", "tsh", "creatinine", "glucose", "wbc", "rbc", "platelet"];
+const LAB_KEYWORDS = [
+  "hb",
+  "hemoglobin",
+  "tsh",
+  "creatinine",
+  "glucose",
+  "sugar",
+  "wbc",
+  "rbc",
+  "platelet",
+  "cholesterol",
+  "bilirubin",
+  "sgpt",
+  "sgot",
+  "urea",
+  "uric acid",
+];
 
-function linesMatching(text: string, hints: string[]): string[] {
+function extractMedicines(text: string): string[] {
   return text
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && hints.some((h) => line.toLowerCase().includes(h)))
+    .filter((line) => {
+      if (line.length === 0) return false;
+      const lower = line.toLowerCase();
+      // Skip lab lines that happen to have mg/dL unless explicit medication format
+      const isLabLine = lower.includes("mg/dl") || lower.includes("g/dl") || lower.includes("mmol/l");
+      if (isLabLine && !MEDICINE_KEYWORDS.some((kw) => lower.includes(kw))) {
+        return false;
+      }
+      const hasDosage = /\b\d+\s*(mg|mcg|ml|gm)\b/i.test(line);
+      const hasKeyword = MEDICINE_KEYWORDS.some((kw) => lower.includes(kw));
+      return hasKeyword || hasDosage;
+    })
     .slice(0, 8);
 }
+
+function extractLabs(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (line.length === 0) return false;
+      const lower = line.toLowerCase();
+      const hasLabKw = LAB_KEYWORDS.some((kw) => lower.includes(kw));
+      const hasLabUnit = lower.includes("mg/dl") || lower.includes("g/dl") || lower.includes("u/l") || lower.includes("uIu/ml") || lower.includes("mmol/l");
+      return hasLabKw || hasLabUnit;
+    })
+    .slice(0, 8);
+}
+
 
 export function buildDocumentExtractMeta(input: {
   kind: DocumentKind;
@@ -83,9 +134,10 @@ export function buildDocumentExtractMeta(input: {
     handwritingLikely,
     rawText: input.rawText,
     structuredFields: {
-      possibleMedicines: linesMatching(input.rawText, MEDICINE_HINTS),
-      possibleLabs: linesMatching(input.rawText, LAB_HINTS),
+      possibleMedicines: extractMedicines(input.rawText),
+      possibleLabs: extractLabs(input.rawText),
     },
+
     attachedToVisit: true,
     mergedIntoClinicalSlots: false,
   };
