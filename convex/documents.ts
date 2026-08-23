@@ -1,6 +1,8 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getUserSafely, requireRole } from "./lib/rbac";
+import type { Id } from "./_generated/dataModel";
+
 
 
 export const generateUploadUrl = mutation({
@@ -73,26 +75,26 @@ export const reviewExtract = mutation({
 export const listPatientDocumentExtracts = query({
   args: {
     sessionUserId: v.union(v.id("users"), v.string()),
-    patientId: v.optional(v.id("patients")),
+    patientId: v.optional(v.union(v.id("patients"), v.string())),
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("documentExtracts"),
-      documentId: v.id("documents"),
-      visitId: v.id("visits"),
-      rawText: v.string(),
-      structuredJson: v.string(),
-      confidence: v.number(),
-      reviewStatus: v.string(),
-      createdAt: v.number(),
-    })
-  ),
   handler: async (ctx, args) => {
     const user = await getUserSafely(ctx, args.sessionUserId);
     if (!user) return [];
-    const targetPatientId = args.patientId ?? user.patientId;
+    
+    let targetPatientId: Id<"patients"> | undefined = user.patientId;
+    if (args.patientId) {
+      const norm = ctx.db.normalizeId("patients", args.patientId);
+      if (norm) targetPatientId = norm;
+    }
+    if (!targetPatientId) {
+      // Check if patient row exists by user
+      const patient = await ctx.db
+        .query("patients")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+      if (patient) targetPatientId = patient._id;
+    }
     if (!targetPatientId) return [];
-
 
     const visits = await ctx.db
       .query("visits")
@@ -100,26 +102,37 @@ export const listPatientDocumentExtracts = query({
       .collect();
 
     const extracts: Array<{
-      _id: typeof visits[0]["_id"] extends any ? any : never;
-      documentId: any;
-      visitId: any;
+      _id: Id<"documentExtracts">;
+      documentId: Id<"documents">;
+      visitId: Id<"visits">;
       rawText: string;
       structuredJson: string;
       confidence: number;
-      reviewStatus: "pending" | "confirmed" | "corrected" | "failed";
+      reviewStatus: string;
       createdAt: number;
     }> = [];
-
 
     for (const v of visits) {
       const visitExtracts = await ctx.db
         .query("documentExtracts")
         .withIndex("by_visit", (q) => q.eq("visitId", v._id))
         .collect();
-      extracts.push(...visitExtracts);
+      for (const ext of visitExtracts) {
+        extracts.push({
+          _id: ext._id,
+          documentId: ext.documentId,
+          visitId: ext.visitId,
+          rawText: ext.rawText ?? "",
+          structuredJson: ext.structuredJson ?? "{}",
+          confidence: typeof ext.confidence === "number" ? ext.confidence : 0,
+          reviewStatus: ext.reviewStatus ?? "pending",
+          createdAt: ext.createdAt ?? Date.now(),
+        });
+      }
     }
 
     return extracts.sort((a, b) => b.createdAt - a.createdAt);
   },
 });
+
 
