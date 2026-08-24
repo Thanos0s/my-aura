@@ -50,12 +50,12 @@ export function FloatingTerminalButton() {
             </div>
             <div className="flex justify-between rounded-2xl bg-white/5 p-2.5 border border-white/5">
               <span className="text-slate-300">Signal Engine</span>
-              <span className="font-mono font-bold text-sky-200">Sarvam ASR & OCR ⚡</span>
+              <span className="font-mono font-bold text-sky-200">Sarvam ASR & OCR </span>
             </div>
           </div>
 
           <p className="mt-3 text-[10px] text-slate-400 font-mono text-center">
-            My Aura AYUSH Clinical Intelligence 🌿
+            My Aura AYUSH Clinical Intelligence 
           </p>
         </div>
       )}

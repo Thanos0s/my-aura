@@ -32,7 +32,7 @@ function StaffApp() {
 
       {escalated.length === 0 ? (
         <div className="rounded-3xl bg-white p-12 text-center shadow-sm border border-slate-100/90">
-          <span className="text-3xl">✅</span>
+          <span className="text-3xl"></span>
           <p className="mt-2 text-sm font-bold text-slate-800">All Clear</p>
           <p className="text-xs text-slate-500 mt-0.5">No open red-flag escalations on the clinic floor.</p>
         </div>
@@ -42,7 +42,7 @@ function StaffApp() {
             <li key={v._id} className="rounded-3xl bg-white p-6 shadow-sm border border-rose-200 ring-2 ring-rose-50 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-0.5 uppercase">
-                  ⚠️ Escalation Active
+                   Escalation Active
                 </span>
                 <span className="font-mono text-xs text-slate-400">Kiosk: {v.kioskId}</span>
               </div>

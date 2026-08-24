@@ -119,7 +119,7 @@ function AdminApp() {
                           : "bg-sky-100 text-sky-800"
                       }`}
                     >
-                      {a.channel === "whatsapp" ? "📲 WhatsApp" : "🌐 Web Portal"}
+                      {a.channel === "whatsapp" ? " WhatsApp" : " Web Portal"}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
@@ -137,7 +137,7 @@ function AdminApp() {
                   </div>
 
                   <p className="text-slate-600 text-xs">
-                    📅{" "}
+                    {" "}
                     <strong>
                       {new Date(a.scheduledAt).toLocaleString("en-IN", {
                         dateStyle: "medium",

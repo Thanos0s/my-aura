@@ -20,6 +20,18 @@ import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
 import type { DocumentExtractMeta, DocumentKind } from "@/lib/documents/metadata";
 import { DocumentPipelineRail, IntakePipelineRail } from "@/components/PipelineRails";
 
+
+import {
+  Bot,
+  User,
+  Volume2,
+  Mic,
+  ShieldAlert,
+  Square,
+} from "lucide-react";
+
+
+
 export type BoundProfile = {
   displayName: string;
   sessionUserId: string;
@@ -362,12 +374,13 @@ export function KioskWizard({
     setTyped("");
 
     if (next.phase === "escalated") {
-      setMessage("⚠️ Staff have been alerted immediately. Please stay here for immediate assistance.");
+      setMessage("Staff have been alerted immediately. Please stay here for immediate assistance.");
       if (adapters && visitId) {
         await adapters.escalate({ visitId, questionId: prompt.id, intakeJson: JSON.stringify(next) });
       }
       return;
     }
+
 
     await persist(next);
 
@@ -694,7 +707,7 @@ export function KioskWizard({
                         if (!displayName || displayName === "Patient") setDisplayName("Rajesh Kumar");
                       }}
                     >
-                      ⚡ Quick Scan Demo ABHA
+                       Quick Scan Demo ABHA
                     </button>
                   </div>
 
@@ -735,7 +748,7 @@ export function KioskWizard({
                       }`}
                       onClick={() => setState({ ...state, answeredBy: "patient" })}
                     >
-                      👤 I am the patient
+                      I am the patient
                     </button>
                     <button
                       type="button"
@@ -746,7 +759,7 @@ export function KioskWizard({
                       }`}
                       onClick={() => setState({ ...state, answeredBy: "attendant" })}
                     >
-                      🤝 Attendant / Caregiver
+                      Attendant / Caregiver
                     </button>
                   </div>
                 </div>
@@ -776,7 +789,7 @@ export function KioskWizard({
                     className="btn-ghost px-3 py-1 text-xs font-semibold flex items-center gap-1.5"
                     onClick={() => void speak("नमस्ते! आप अपनी भाषा चुन सकते हैं।")}
                   >
-                    🔊 Test Audio
+                    Test Audio
                   </button>
                 </div>
 
@@ -870,7 +883,7 @@ export function KioskWizard({
                       )
                     }
                   >
-                    🔊 Listen to Voice Explanation
+                    <Volume2 className="h-3.5 w-3.5 inline mr-1" /> Listen to Voice Explanation
                   </button>
                 </div>
 
@@ -914,7 +927,7 @@ export function KioskWizard({
                     onClick={() => setState({ ...state, pathway: "allopathic" })}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xl">🩺</span>
+                      <span className="text-xl"></span>
                       {state.pathway === "allopathic" && <span className="text-xs font-bold">Selected ✓</span>}
                     </div>
                     <p className="font-bold text-sm">Regular / Allopathic OPD</p>
@@ -933,7 +946,7 @@ export function KioskWizard({
                     onClick={() => setState({ ...state, pathway: "ayush" })}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xl">🌿</span>
+                      <span className="text-xl"></span>
                       {state.pathway === "ayush" && <span className="text-xs font-bold">Selected ✓</span>}
                     </div>
                     <p className="font-bold text-sm">Ayurvedic OPD (AIIA-type)</p>
@@ -983,7 +996,7 @@ export function KioskWizard({
               <div className="flex items-center gap-2">
                 {state.pathway === "ayush" && (
                   <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                    🌿 Ayurvedic OPD
+                    Ayurvedic OPD
                   </span>
                 )}
                 <button
@@ -1006,7 +1019,11 @@ export function KioskWizard({
                     }
                   }}
                 >
-                  <span>{voiceChatMode ? "🎙️ Voice Bot: ON" : "⌨️ Touch Mode"}</span>
+                  <span className="flex items-center gap-1.5">
+                    {voiceChatMode ? <Mic className="h-3.5 w-3.5" /> : null}
+                    <span>{voiceChatMode ? "Voice Bot: ON" : "Touch Mode"}</span>
+                  </span>
+
                 </button>
               </div>
             </div>
@@ -1015,7 +1032,7 @@ export function KioskWizard({
             {prompt.group === "dashavidha" && (
               <div className="rounded-2xl bg-emerald-50/70 p-3 border border-emerald-200/80 space-y-1.5">
                 <p className="font-mono text-[10px] font-bold text-emerald-950 uppercase tracking-wider">
-                  🌿 Dashavidha Pariksha Factor Checklist (10 Ayurvedic Pillars):
+                  Dashavidha Pariksha Factor Checklist (10 Ayurvedic Pillars):
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                   {DASHAVIDHA_FACTORS.map((factor, i) => (
@@ -1050,7 +1067,7 @@ export function KioskWizard({
                   {/* AI Question on Left */}
                   <div className="flex items-start gap-2.5 max-w-xl">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sm shadow-xs border border-sky-200">
-                      🤖
+                      <Bot className="h-4 w-4" />
                     </div>
                     <div className="rounded-2xl bg-white p-3 shadow-xs border border-slate-200 text-xs text-slate-800">
                       <p className="font-semibold text-slate-900">{item.question}</p>
@@ -1063,7 +1080,7 @@ export function KioskWizard({
                       <p className="font-medium">{item.answer}</p>
                     </div>
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xs font-bold text-emerald-900 shadow-xs border border-emerald-200">
-                      👤
+                      <User className="h-4 w-4" />
                     </div>
                   </div>
                 </div>
@@ -1072,7 +1089,7 @@ export function KioskWizard({
               {/* ── Active AI Question Bubble ──────────────────────────────── */}
               <div className="flex items-start gap-2.5 max-w-2xl pt-1">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
-                  🤖
+                  <Bot className="h-4 w-4" />
                 </div>
                 <div className="flex-1 rounded-2xl bg-white p-4 shadow-sm border border-sky-200 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1080,7 +1097,7 @@ export function KioskWizard({
                       <span className="font-bold text-xs text-slate-900">Aura Clinical AI</span>
                       {isSpeaking ? (
                         <span className="inline-flex items-center gap-1 font-mono text-[10px] text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200 animate-pulse">
-                          🔊 {state.languageCode.startsWith("hi") ? "AI बोल रहा है..." : "AI speaking..."}
+                          <Volume2 className="h-3.5 w-3.5 inline mr-1" /> {state.languageCode.startsWith("hi") ? "AI बोल रहा है..." : "AI speaking..."}
                         </span>
                       ) : (
                         <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -1093,7 +1110,7 @@ export function KioskWizard({
                       className="text-xs text-sky-700 hover:text-sky-950 font-bold flex items-center gap-1 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-xl transition-colors"
                       onClick={() => void speak(prompt.text)}
                     >
-                      🔊 {state.languageCode.startsWith("hi") ? "दोबारा सुनें" : "Listen Again"}
+                      <Volume2 className="h-3.5 w-3.5 inline mr-1" /> {state.languageCode.startsWith("hi") ? "दोबारा सुनें" : "Listen Again"}
                     </button>
                   </div>
 
@@ -1123,8 +1140,8 @@ export function KioskWizard({
                     <span className="flex h-3 w-3 rounded-full bg-rose-600" />
                     <span className="text-xs font-bold">
                       {state.languageCode.startsWith("hi")
-                        ? `🎙️ आपकी आवाज़ सुनी जा रही है (${recordingSeconds}s)... बोलिए`
-                        : `🎙️ Listening to you (${recordingSeconds}s)... Speak now`}
+                        ? `<Mic className="h-3.5 w-3.5 inline mr-1" /> आपकी आवाज़ सुनी जा रही है (${recordingSeconds}s)... बोलिए`
+                        : `<Mic className="h-3.5 w-3.5 inline mr-1" /> Listening to you (${recordingSeconds}s)... Speak now`}
                     </span>
                   </div>
                   <button
@@ -1179,7 +1196,9 @@ export function KioskWizard({
                   }
                 }}
               >
-                <span className="text-base">{isRecording ? "⏹️" : "🎙️"}</span>
+                <span className="flex items-center justify-center">
+                  {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </span>
                 <span>
                   {isRecording
                     ? state.languageCode.startsWith("hi")
@@ -1229,11 +1248,14 @@ export function KioskWizard({
         {state.phase === "escalated" && (
           <section className="rounded-3xl bg-rose-50 border-2 border-rose-400 p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🚨</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                <ShieldAlert className="h-5 w-5" />
+              </span>
               <span className="font-mono text-xs font-bold uppercase tracking-wider text-rose-800 bg-rose-100 px-2 py-0.5 rounded-full">
                 Emergency Triage Alert Dispatched
               </span>
             </div>
+
             <h2 className="text-xl font-bold text-rose-950">Clinical Staff Have Been Alerted</h2>
             <p className="text-xs text-rose-900 leading-relaxed">
               Your response indicates symptoms that require immediate clinical evaluation (chest pain / severe breathlessness / red-flag).
@@ -1262,9 +1284,9 @@ export function KioskWizard({
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["prescription", "💊 Prescription (Rx)"],
-                  ["lab", "🔬 Lab Sheet"],
-                  ["scan", "🏥 Scan / Discharge"],
+                  ["prescription", "Prescription (Rx)"],
+                  ["lab", "Lab Sheet"],
+                  ["scan", "Scan / Discharge"],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -1392,7 +1414,7 @@ export function KioskWizard({
                       key={i}
                       className="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-slate-800 border border-sky-200"
                     >
-                      {d.kind === "prescription" ? "💊 Rx" : d.kind === "lab" ? "🔬 Lab" : "🏥 Summary"} ({Math.round(d.confidence * 100)}%)
+                      {d.kind === "prescription" ? "Rx" : d.kind === "lab" ? "Lab" : "Summary"} ({Math.round(d.confidence * 100)}%)
                     </span>
                   ))}
                 </div>

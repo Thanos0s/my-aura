@@ -34,20 +34,27 @@ html,
 body {
   background: radial-gradient(circle at 10% 15%, #e2eff5 0%, #edf5f8 50%, #e3eff5 100%);
   background-attachment: fixed;
-  color: #334155;
+  color: #1e293b;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15.5px;
+  line-height: 1.6;
   letter-spacing: -0.01em;
   min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
 h2,
 h3,
+h4,
+h5,
+h6,
 .tl-display {
   color: #0f172a;
   letter-spacing: -0.03em;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 code,
@@ -55,6 +62,7 @@ pre,
 .tl-data {
   font-family: var(--font-mono);
 }
+
 
 a {
   text-decoration: none;

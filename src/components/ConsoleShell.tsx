@@ -41,7 +41,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         >
           <Link href="/" className="flex items-center gap-2.5 min-w-0 group">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm transition-transform group-hover:scale-105">
-              <span className="text-base">🌿</span>
+              <span className="text-base"></span>
             </div>
             <div>
               <p className="font-bold text-base tracking-tight text-slate-900 leading-tight">My Aura</p>

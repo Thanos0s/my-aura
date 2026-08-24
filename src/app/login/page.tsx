@@ -56,7 +56,7 @@ export default function LoginHubPage() {
       {session?.userId && session?.role && (
         <div className="rounded-3xl bg-white p-6 md:p-8 shadow-md border border-slate-100/90 text-center space-y-3">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white">
-            <span className="text-xl">🌿</span>
+            <span className="text-xl"></span>
           </div>
           <h2 className="text-xl font-bold text-slate-900">Already Logged In</h2>
           <p className="text-xs text-slate-500">
