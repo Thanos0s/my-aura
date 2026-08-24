@@ -11,21 +11,31 @@ import { DocumentPipelinePanel } from "@/components/DocumentPipelinePanel";
 import { DoctorDispatchPanel } from "@/components/DoctorDispatchPanel";
 import {
   canCompleteIntake,
-
   DASHAVIDHA_FACTORS,
   normalizeDashavidha,
   type IntakeState,
   type Slot,
 } from "@/lib/intake/engine";
 import { RoleGate, useAuraSession } from "@/components/useAuraSession";
+import {
+  User,
+  Edit2,
+  Car,
+  Columns,
+  Stethoscope,
+  FileText,
+  AlertCircle,
+  AlertTriangle,
+  X,
+} from "lucide-react";
 
 export default function PractitionerPage() {
   if (!convexConfigured()) {
     return (
       <main className="px-4 py-8 md:px-8">
-        <p className="tl-overline">Clinic</p>
-        <h1 className="mt-2 text-2xl">Practitioner</h1>
-        <p className="mt-4 text-body">Run Convex and sign in as practitioner@aura.local.</p>
+        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">Clinic</p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-900">Practitioner</h1>
+        <p className="mt-2 text-xs text-slate-500">Run Convex and sign in as practitioner@aura.local.</p>
       </main>
     );
   }
@@ -75,7 +85,6 @@ function PractitionerApp() {
   const [msg, setMsg] = useState("");
   const [isEditingDocName, setIsEditingDocName] = useState(false);
   const [docNameInput, setDocNameInput] = useState("");
-
 
   const patientId = detail?.visit.patientId ?? patientFilter;
   const chartArgs =
@@ -174,7 +183,6 @@ function PractitionerApp() {
     }
   }
 
-
   async function handleDoctorReview(
     extractId: Id<"documentExtracts">,
     status: "confirmed" | "corrected",
@@ -249,24 +257,24 @@ function PractitionerApp() {
       }`}
     >
       {/* Left Column: Clinic & Patient Queue */}
-      <aside className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90 h-fit space-y-4">
+      <aside className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90 h-fit space-y-5">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold">OPD Desk</p>
-          <h1 className="text-xl font-bold text-slate-900">Practitioner Console</h1>
+          <h1 className="text-lg font-bold text-slate-900 mt-0.5">Practitioner Console</h1>
           
-          <div className="mt-1">
+          <div className="mt-2">
             {isEditingDocName ? (
               <div className="flex items-center gap-1.5 pt-1">
                 <input
                   type="text"
-                  className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-sky-500 w-full"
+                  className="rounded-xl border border-slate-300 px-2.5 py-1 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#1b343f] w-full"
                   value={docNameInput}
                   onChange={(e) => setDocNameInput(e.target.value)}
                   placeholder="e.g. Dr. Rajesh Sharma"
                   autoFocus
                 />
                 <button
-                  className="rounded-lg bg-[#1b343f] px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-[#274d5d]"
+                  className="rounded-xl bg-[#1b343f] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#274d5d]"
                   onClick={async () => {
                     if (!docNameInput.trim() || !sessionUserId) return;
                     await updateName({ sessionUserId, displayName: docNameInput.trim() });
@@ -276,32 +284,35 @@ function PractitionerApp() {
                   Save
                 </button>
                 <button
-                  className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                  className="rounded-xl bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
                   onClick={() => setIsEditingDocName(false)}
                 >
-                  ✕
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 border border-slate-200/70 rounded-xl px-2.5 py-1 mt-1.5">
-                <span className="font-semibold text-slate-800 truncate">
-                  👨‍⚕️ {doctorName}
-                </span>
+              <div className="flex items-center justify-between text-xs text-slate-700 bg-slate-50 border border-slate-200/70 rounded-2xl px-3 py-1.5">
+                <div className="flex items-center gap-2 truncate">
+                  <User className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <span className="font-semibold text-slate-800 truncate">
+                    {doctorName}
+                  </span>
+                </div>
                 <button
-                  className="text-[11px] text-sky-700 hover:text-sky-900 font-medium px-1 rounded hover:bg-sky-100 transition-colors shrink-0 ml-1"
+                  className="text-[11px] text-sky-700 hover:text-sky-900 font-semibold px-1.5 py-0.5 rounded-lg hover:bg-sky-100 transition-colors shrink-0 ml-1 flex items-center gap-1"
                   onClick={() => {
                     setDocNameInput(doctorName);
                     setIsEditingDocName(true);
                   }}
                   title="Change doctor name"
                 >
-                  ✎ Edit
+                  <Edit2 className="h-2.5 w-2.5" />
+                  Edit
                 </button>
               </div>
             )}
           </div>
         </div>
-
 
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Patients</p>
@@ -313,15 +324,14 @@ function PractitionerApp() {
             }`}
             onClick={() => setViewMode("dispatch")}
           >
-            <span className="flex items-center gap-1.5">
-              <span>🚗</span>
+            <span className="flex items-center gap-2">
+              <Car className="h-3.5 w-3.5 text-teal-600" />
               <span>Route Dispatch (VRP)</span>
             </span>
-            <span className="rounded-full bg-teal-600/30 px-1.5 py-0.5 text-[9px] font-mono">LIVE</span>
+            <span className="rounded-full bg-teal-600/20 text-teal-900 px-2 py-0.5 text-[9px] font-mono font-bold">LIVE</span>
           </button>
 
           <ul className="space-y-1.5">
-
             {patients?.map((p) => (
               <li key={p.patientId}>
                 <button
@@ -340,24 +350,22 @@ function PractitionerApp() {
                 
                 {/* Action Options when Patient is Selected */}
                 {patientFilter === p.patientId && (
-                  <div className="mt-2 space-y-1.5">
+                  <div className="mt-2 space-y-1.5 pl-1">
                     <button
-                      className="w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-left text-xs font-semibold text-sky-900 hover:bg-sky-100 transition-all shadow-sm"
+                      className="w-full rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-left text-xs font-semibold text-sky-900 hover:bg-sky-100 transition-all shadow-xs"
                       onClick={() => {
-                        // Build Summary action
                         setViewMode("desk");
                         setNotice("Building unified clinical sheet for " + p.displayName);
                       }}
                     >
                       <span className="block font-mono text-[10px] text-sky-600 mb-0.5">04</span>
-                      <span className="block font-semibold">Build Summary</span>
+                      <span className="block font-bold">Build Summary</span>
                       <span className="block text-[10px] text-sky-700 mt-0.5">Unified clinical sheet · ABHA link</span>
                     </button>
                     
                     <button
-                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-left text-xs font-semibold text-emerald-900 hover:bg-emerald-100 transition-all shadow-sm"
+                      className="w-full rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-left text-xs font-semibold text-emerald-900 hover:bg-emerald-100 transition-all shadow-xs"
                       onClick={() => {
-                        // See the Doctor action - open the first available visit for this patient
                         const patientVisit = queue?.find(v => v.patientId === p.patientId);
                         if (patientVisit) {
                           setSelected(patientVisit._id);
@@ -369,7 +377,7 @@ function PractitionerApp() {
                       }}
                     >
                       <span className="block font-mono text-[10px] text-emerald-600 mb-0.5">05</span>
-                      <span className="block font-semibold">See the Doctor</span>
+                      <span className="block font-bold">See the Doctor</span>
                       <span className="block text-[10px] text-emerald-700 mt-0.5">OPD screen ready · Fast consultation</span>
                     </button>
                   </div>
@@ -381,11 +389,11 @@ function PractitionerApp() {
 
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Queue</p>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {queue?.map((v) => (
               <li key={v._id}>
                 <button
-                  className={`w-full rounded-2xl border p-3 text-left transition-all ${
+                  className={`w-full rounded-2xl border p-2.5 text-left transition-all ${
                     v.status === "escalated"
                       ? "border-rose-300 bg-rose-50 text-rose-900 shadow-xs"
                       : selected === v._id
@@ -413,42 +421,46 @@ function PractitionerApp() {
       </aside>
 
       {/* Center Column: Clinical Consultation Desk */}
-      <main className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
+      <main className="rounded-3xl bg-white p-5 md:p-7 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
         {viewMode === "dispatch" ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Home Care Dispatch</p>
-                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">Route & Travel Optimization</h2>
+                <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider font-bold">Home Care Dispatch</p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900">Route & Travel Optimization</h2>
               </div>
-              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("split")}
                 >
-                  🔲 3-Column Split
+                  <Columns className="h-3 w-3" />
+                  3-Column Split
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("desk")}
                 >
+                  <Stethoscope className="h-3 w-3" />
                   Consultation Desk
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("pipeline")}
                 >
-                  📄 Document Pipeline & OCR
+                  <FileText className="h-3 w-3" />
+                  Document Pipeline & OCR
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold bg-[#1b343f] text-white shadow-xs"
+                  className="rounded-full px-3 py-1 text-xs font-semibold bg-[#1b343f] text-white shadow-xs flex items-center gap-1.5"
                   onClick={() => setViewMode("dispatch")}
                 >
-                  🚗 Route Dispatch (VRP)
+                  <Car className="h-3 w-3" />
+                  Route Dispatch (VRP)
                 </button>
               </div>
             </div>
@@ -460,57 +472,61 @@ function PractitionerApp() {
           </div>
         ) : !detail ? (
           <div className="text-center py-16 text-slate-400 space-y-3">
-            <span className="text-3xl">🩺</span>
-            <p className="text-sm">Select a patient visit from the queue to start consultation, or open Route Dispatch.</p>
+            <Stethoscope className="h-10 w-10 mx-auto text-slate-300" />
+            <p className="text-xs text-slate-600 font-medium">Select a patient visit from the queue to start consultation, or open Route Dispatch.</p>
             <button
               onClick={() => setViewMode("dispatch")}
               className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-teal-800 transition-colors"
             >
-              🚗 Open Doctor Route Dispatch (VRP)
+              <Car className="h-3.5 w-3.5" />
+              Open Doctor Route Dispatch (VRP)
             </button>
           </div>
         ) : viewMode === "pipeline" ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Case Documents</p>
-                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">{detail.patientName}</h2>
+                <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider font-bold">Case Documents</p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900">{detail.patientName}</h2>
                 <p className="text-xs text-slate-500">
                   {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway} · {detail.visit.languageCode}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("split")}
                 >
-                  🔲 3-Column Split
+                  <Columns className="h-3 w-3" />
+                  3-Column Split
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("desk")}
                 >
+                  <Stethoscope className="h-3 w-3" />
                   Consultation Desk
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold bg-[#1b343f] text-white shadow-xs"
+                  className="rounded-full px-3 py-1 text-xs font-semibold bg-[#1b343f] text-white shadow-xs flex items-center gap-1.5"
                   onClick={() => setViewMode("pipeline")}
                 >
-                  📄 Document Pipeline & OCR ({detail.extracts.length})
+                  <FileText className="h-3 w-3" />
+                  Document Pipeline & OCR ({detail.extracts.length})
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("dispatch")}
                 >
-                  🚗 Route Dispatch (VRP)
+                  <Car className="h-3 w-3" />
+                  Route Dispatch (VRP)
                 </button>
               </div>
             </div>
-
 
             <DocumentPipelinePanel
               extracts={detail.extracts}
@@ -523,7 +539,10 @@ function PractitionerApp() {
           <>
             {detail.flags.some((f) => f.escalationStatus === "open") ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-xs">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700"> Red Flag Alert</p>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Red Flag Alert
+                </p>
                 {detail.flags.map((f) => (
                   <p key={f._id} className="mt-2 font-mono text-xs text-rose-950 flex items-center justify-between">
                     <span>{f.questionId}</span>
@@ -541,58 +560,61 @@ function PractitionerApp() {
             {/* Case Header & View Switcher */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Clinical Case</p>
-                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">{detail.patientName}</h2>
+                <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider font-bold">Clinical Case</p>
+                <h2 className="mt-0.5 text-lg font-bold text-slate-900">{detail.patientName}</h2>
                 <p className="text-xs text-slate-500">
                   {detail.abhaId ? `ABHA ${detail.abhaId}` : "No ABHA"} · {detail.visit.pathway}
                 </p>
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   type="button"
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     viewMode === "split"
                       ? "bg-[#1b343f] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                   onClick={() => setViewMode("split")}
                 >
-                  🔲 3-Column Split
+                  <Columns className="h-3 w-3" />
+                  3-Column Split
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
                     viewMode === "desk"
                       ? "bg-[#1b343f] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                   onClick={() => setViewMode("desk")}
                 >
-                   Consultation Desk
+                  <Stethoscope className="h-3 w-3" />
+                  Consultation Desk
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("pipeline")}
                 >
-                  📄 Document Pipeline & OCR ({detail.extracts.length})
+                  <FileText className="h-3 w-3" />
+                  Document Pipeline & OCR ({detail.extracts.length})
                 </button>
                 <button
                   type="button"
-                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="rounded-full px-3 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5"
                   onClick={() => setViewMode("dispatch")}
                 >
-                  🚗 Route Dispatch (VRP)
+                  <Car className="h-3 w-3" />
+                  Route Dispatch (VRP)
                 </button>
               </div>
             </div>
 
-
             {viewMode === "desk" && (
               <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-lg">📄</span>
+                  <FileText className="h-5 w-5 text-sky-700 shrink-0" />
                   <div>
                     <p className="text-xs font-bold text-sky-950">
                       Document Pipeline: {detail.extracts.length} attached {ocrBlocked ? "· review pending" : ""}
@@ -604,7 +626,7 @@ function PractitionerApp() {
                 </div>
                 <button
                   type="button"
-                  className="btn-ghost px-4 py-1.5 text-xs font-semibold"
+                  className="btn-ghost px-3.5 py-1.5 text-xs font-semibold"
                   onClick={() => setViewMode("pipeline")}
                 >
                   Open Document Station →
@@ -614,9 +636,9 @@ function PractitionerApp() {
 
             {notice ? <p className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs font-mono text-amber-900">{notice}</p> : null}
 
-            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
               <p className="font-mono text-[10px] uppercase font-bold text-slate-400">History</p>
-              <h3 className="text-base font-bold text-slate-900 mt-1">Previous Consultations</h3>
+              <h3 className="text-sm font-bold text-slate-900">Previous Consultations</h3>
               <ul className="mt-2 font-mono text-xs space-y-1">
                 {history?.map((v) => (
                   <li key={v._id}>
@@ -628,21 +650,26 @@ function PractitionerApp() {
               </ul>
             </section>
 
-            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Symptom Timeline</h3>
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Timeline</p>
+              <h3 className="text-sm font-bold text-slate-900">Symptom Timeline</h3>
               <div className="mt-2 space-y-1">
-                {symptoms?.map((s) => (
-                  <p key={s._id} className="font-mono text-xs text-slate-700">
-                    {new Date(s.createdAt).toLocaleString()} · Severity {s.severity}/10 · {s.text}
-                  </p>
-                ))}
+                {symptoms && symptoms.length > 0 ? (
+                  symptoms.map((s) => (
+                    <p key={s._id} className="font-mono text-xs text-slate-700">
+                      {new Date(s.createdAt).toLocaleString()} · Severity {s.severity}/10 · {s.text}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400">No previous symptom records.</p>
+                )}
               </div>
             </section>
 
             {intake ? <StructuredRecord intake={intake} onCorrect={correct} /> : null}
 
             {intake ? (
-              <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
                 <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Validation</p>
                 {canCompleteIntake({ ...intake, patientRecapConfirmed: true }).reasons.map((r) => (
                   <p key={r} className="font-mono text-xs text-amber-800 font-semibold">{r}</p>
@@ -650,19 +677,19 @@ function PractitionerApp() {
               </section>
             ) : null}
 
-            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
               <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Dashavidha Pariksha</p>
-              <h3 className="text-base font-bold text-slate-900 mt-1">Practitioner Assessment & Interpretation</h3>
+              <h3 className="text-sm font-bold text-slate-900">Practitioner Assessment & Interpretation</h3>
               <p className="text-xs text-slate-500">AI slots provide intake assistance. Practitioner writes the final clinical assessment.</p>
               <textarea
-                className="tl-input mt-2"
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f] mt-2"
                 rows={3}
                 defaultValue={ayurveda?.interpretation ?? ""}
                 onChange={(e) => setInterpretation(e.target.value)}
                 placeholder="e.g. Vata-Pitta Prakriti with mild Sama Agni, Pravara Bala..."
               />
               <button
-                className="btn-pulse mt-2 px-4 py-1.5 text-xs font-semibold"
+                className="btn-pulse mt-2 px-4 py-2 text-xs font-bold"
                 onClick={() => {
                   if (!selected || !sessionUserId) return;
                   void saveAyurveda({
@@ -676,39 +703,65 @@ function PractitionerApp() {
               </button>
             </section>
 
-
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Practitioner notes</h3>
+            <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Clinical Notes</p>
+                <h3 className="text-sm font-bold text-slate-900">Practitioner Notes</h3>
+              </div>
               {notes?.map((n) => (
-                <p key={n._id} className="mt-1 text-sm text-mist">
+                <p key={n._id} className="mt-1 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                   {n.body}
                 </p>
               ))}
-              <textarea className="tl-input mt-2" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+              <textarea
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Add clinical observation or prescription notes..."
+              />
               <button
-                className="btn-ghost mt-2 px-4 py-1.5 text-sm"
+                className="btn-ghost px-4 py-2 text-xs font-bold"
                 onClick={async () => {
                   if (!patientId || !note.trim()) return;
                   await saveNote({ sessionUserId: actorId, patientId, visitId: selected ?? undefined, body: note });
                   setNote("");
                 }}
               >
-                Add note
+                Add Note
               </button>
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Care / treatment plan</h3>
+            <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Prescription & Care</p>
+                <h3 className="text-sm font-bold text-slate-900">Care / Treatment Plan</h3>
+              </div>
               {carePlans?.map((p) => (
-                <p key={p._id} className="tl-tag mt-1">
-                  {p.status} · {p.title}
-                </p>
+                <div key={p._id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{p.title}</span>
+                    <span className="font-mono text-[10px] font-bold text-slate-500 uppercase">{p.status}</span>
+                  </div>
+                  {p.body && <p className="text-xs text-slate-600 mt-1">{p.body}</p>}
+                </div>
               ))}
-              <input className="tl-input mt-2" value={careTitle} onChange={(e) => setCareTitle(e.target.value)} />
-              <textarea className="tl-input mt-2" rows={3} value={careBody} onChange={(e) => setCareBody(e.target.value)} />
-              <div className="mt-2 flex gap-2">
+              <input
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]"
+                value={careTitle}
+                onChange={(e) => setCareTitle(e.target.value)}
+                placeholder="Treatment Plan Title (e.g. 14-Day Shamana Chikitsa)"
+              />
+              <textarea
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]"
+                rows={3}
+                value={careBody}
+                onChange={(e) => setCareBody(e.target.value)}
+                placeholder="Medications, dosage, timings and restrictions..."
+              />
+              <div className="flex gap-2">
                 <button
-                  className="btn-ghost px-3 py-1.5 text-sm"
+                  className="btn-ghost px-3.5 py-2 text-xs font-semibold"
                   onClick={() =>
                     patientId
                       ? void saveCare({
@@ -722,10 +775,10 @@ function PractitionerApp() {
                       : undefined
                   }
                 >
-                  Save draft
+                  Save Draft
                 </button>
                 <button
-                  className="btn-pulse px-3 py-1.5 text-sm"
+                  className="btn-pulse px-4 py-2 text-xs font-bold"
                   onClick={() =>
                     patientId
                       ? void saveCare({
@@ -739,18 +792,21 @@ function PractitionerApp() {
                       : undefined
                   }
                 >
-                  Approve for patient
+                  Approve for Patient
                 </button>
               </div>
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Dietitian referral</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
+            <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Collaborative Care</p>
+                <h3 className="text-sm font-bold text-slate-900">Dietitian Referral</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {dietitians?.map((d) => (
                   <button
                     key={d._id}
-                    className="btn-ghost px-3 py-1 text-sm"
+                    className="btn-ghost px-3 py-1.5 text-xs font-semibold"
                     onClick={() =>
                       patientId
                         ? void refer({
@@ -762,62 +818,84 @@ function PractitionerApp() {
                         : undefined
                     }
                   >
-                    Refer {d.displayName}
+                    Refer to {d.displayName}
                   </button>
                 ))}
               </div>
               {dietPlans?.map((p) => (
-                <div key={p._id} className="tl-card mt-2 p-3">
-                  <p>
-                    {p.title} · {p.practitionerApproved ? "approved" : "pending"}
-                  </p>
-                  <button
-                    className="btn-pulse mt-2 px-3 py-1 text-xs"
-                    onClick={() => void approveDiet({ sessionUserId: actorId, planId: p._id, approved: true })}
-                  >
-                    Approve diet plan for patient
-                  </button>
+                <div key={p._id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{p.title}</span>
+                    <span className="font-mono text-[10px] font-bold text-slate-500 uppercase">
+                      {p.practitionerApproved ? "approved" : "pending"}
+                    </span>
+                  </div>
+                  {!p.practitionerApproved && (
+                    <button
+                      className="btn-pulse mt-2 px-3.5 py-1.5 text-xs font-bold"
+                      onClick={() => void approveDiet({ sessionUserId: actorId, planId: p._id, approved: true })}
+                    >
+                      Approve Diet Plan for Patient
+                    </button>
+                  )}
                 </div>
               ))}
               {progress?.map((p) => (
-                <p key={p._id} className="mt-1 text-sm text-mist">
+                <p key={p._id} className="mt-1 text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100">
                   Dietitian: {p.body}
                 </p>
               ))}
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Follow-up / adherence</h3>
+            <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Adherence & Schedule</p>
+                <h3 className="text-sm font-bold text-slate-900">Follow-up / Appointments</h3>
+              </div>
               {appts?.map((a) => (
-                <p key={a._id} className="mt-1 font-mono text-sm">
-                  {new Date(a.scheduledAt).toLocaleString()} · {a.status}{" "}
-                  <button
-                    className="btn-ghost px-2 py-0.5 text-xs"
-                    onClick={() =>
-                      void setAppt({ sessionUserId: actorId, appointmentId: a._id, status: "confirmed" })
-                    }
-                  >
-                    confirm
-                  </button>
-                </p>
+                <div key={a._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-900">{new Date(a.scheduledAt).toLocaleString()}</span>
+                    <span className="ml-2 font-mono text-[10px] font-bold text-slate-500 uppercase">{a.status}</span>
+                  </div>
+                  {a.status !== "confirmed" && (
+                    <button
+                      className="btn-ghost px-2.5 py-1 text-xs font-semibold"
+                      onClick={() =>
+                        void setAppt({ sessionUserId: actorId, appointmentId: a._id, status: "confirmed" })
+                      }
+                    >
+                      Confirm
+                    </button>
+                  )}
+                </div>
               ))}
               {adherence?.map((a) => (
-                <p key={a._id} className="font-mono text-xs text-ash">
-                  {a.kind} · {a.note} · {a.done ? "done" : "missed"}
+                <p key={a._id} className="font-mono text-xs text-slate-600">
+                  {a.kind} · {a.note} · {a.done ? "✓ done" : "✕ missed"}
                 </p>
               ))}
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Messages</h3>
+            <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Communication</p>
+                <h3 className="text-sm font-bold text-slate-900">Messages</h3>
+              </div>
               {messages?.map((m) => (
-                <p key={m._id} className="text-sm">
-                  {m.fromName}: {m.body}
+                <p key={m._id} className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="font-bold text-slate-900">{m.fromName}:</span> {m.body}
                 </p>
               ))}
-              <textarea className="tl-input mt-2" rows={2} value={msg} onChange={(e) => setMsg(e.target.value)} />
+              <textarea
+                className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]"
+                rows={2}
+                value={msg}
+                onChange={(e) => setMsg(e.target.value)}
+                placeholder="Send message to patient..."
+              />
               <button
-                className="btn-ghost mt-2 px-3 py-1 text-sm"
+                className="btn-ghost px-4 py-2 text-xs font-bold"
                 onClick={async () => {
                   if (!patientId || !msg.trim()) return;
                   await sendMessage({
@@ -830,49 +908,57 @@ function PractitionerApp() {
                   setMsg("");
                 }}
               >
-                Message patient
+                Message Patient
               </button>
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <h3 className="text-xl">Doctor edits</h3>
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Audit Trail</p>
+              <h3 className="text-sm font-bold text-slate-900">Doctor Edits</h3>
               {detail.edits.length === 0 ? (
-                <p className="mt-1 text-xs text-mist">No manual corrections made yet.</p>
+                <p className="text-xs text-slate-400">No manual corrections made yet.</p>
               ) : (
                 detail.edits.map((e) => (
-                  <p key={e.createdAt} className="mt-1 font-mono text-sm text-mist">
+                  <p key={e.createdAt} className="font-mono text-xs text-slate-600">
                     {e.fieldPath}: {e.originalValue} → {e.correctedValue} ({e.doctorName})
                   </p>
                 ))
               )}
             </section>
 
-            <section className="border-t border-graphite pt-4">
-              <p className="tl-overline">HIS / EMR</p>
-              <h3 className="text-xl">FHIR bundle (mocked ABDM)</h3>
-              <pre className="tl-surface mt-2 max-h-64 overflow-auto p-3 text-xs text-success">
+            <section className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <p className="font-mono text-[10px] uppercase font-bold text-slate-400">HIS / EMR</p>
+              <h3 className="text-sm font-bold text-slate-900">FHIR Bundle (Mocked ABDM)</h3>
+              <pre className="rounded-xl bg-[#1b343f] text-emerald-300 p-3 max-h-64 overflow-auto font-mono text-xs">
                 {detail.fhirJson ?? "Generated on approve."}
               </pre>
             </section>
 
             {ocrBlocked ? (
-              <div className="rounded border border-pulse bg-onyx/90 p-4 text-xs">
-                <p className="font-semibold text-warning"> Approval Gated on Document Review</p>
-                <p className="mt-1 text-mist">
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs">
+                <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+                  Approval Gated on Document Review
+                </p>
+                <p className="mt-1 text-amber-800">
                   Attached document extracts have pending reviews or low confidence scores. Confirm or correct them in the Document Pipeline panel on the right before finalizing this visit.
                 </p>
               </div>
             ) : null}
 
-            <button className="btn-pulse px-6 py-3" disabled={ocrBlocked} onClick={() => void approve()}>
-              {ocrBlocked ? "Approve blocked — Doctor OCR review required" : "Approve and save (practitioner)"}
+            <button
+              className="btn-pulse w-full py-3.5 text-xs font-bold"
+              disabled={ocrBlocked}
+              onClick={() => void approve()}
+            >
+              {ocrBlocked ? "Approve Blocked — Doctor OCR Review Required" : "Approve and Save (Practitioner)"}
             </button>
           </>
         )}
       </main>
 
       {viewMode === "split" && (
-        <section className="border-t border-graphite p-4 lg:border-t-0 lg:border-l lg:p-5 min-w-0 bg-surface/20">
+        <section className="border-t border-slate-200 p-4 lg:border-t-0 lg:border-l lg:p-5 min-w-0 bg-slate-50/50 rounded-3xl">
           <DocumentPipelinePanel
             extracts={detail?.extracts ?? []}
             onUpload={handleDoctorUpload}
@@ -885,8 +971,6 @@ function PractitionerApp() {
   );
 }
 
-
-
 function SlotFields({
   rows,
   onCorrect,
@@ -895,14 +979,14 @@ function SlotFields({
   onCorrect: (path: string, original: string, next: string) => void;
 }) {
   return (
-    <div className="mt-2 space-y-3">
+    <div className="mt-3 space-y-3">
       {rows.map((row) => (
         <label key={row.path} className="block">
-          <span className="tl-overline">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {row.label} · confidence {Math.round(row.confidence * 100)}%
           </span>
           <input
-            className="tl-input"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f] mt-1"
             defaultValue={row.value}
             onBlur={(e) => {
               if (e.target.value !== row.value) onCorrect(row.path, row.value, e.target.value);
@@ -932,20 +1016,22 @@ function StructuredRecord({
 }) {
   const dashLabels = Object.fromEntries(DASHAVIDHA_FACTORS.map((f) => [f.key, f.label]));
   return (
-    <div className="space-y-6">
-      <section className="border-t border-graphite pt-4">
-        <p className="tl-overline">AI draft</p>
-        <h3 className="text-xl">Editable case summary</h3>
+    <div className="space-y-5">
+      <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-2">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">AI Draft</p>
+        <h3 className="text-sm font-bold text-slate-900">Editable Case Summary (Dashavidha)</h3>
         <SlotFields rows={asRows("dashavidha", intake.dashavidha, dashLabels)} onCorrect={onCorrect} />
       </section>
-      <section className="border-t border-graphite pt-4">
-        <h3 className="text-xl">Clinical history</h3>
+      <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-2">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Clinical History</p>
+        <h3 className="text-sm font-bold text-slate-900">SOCRATES & Systems Review</h3>
         <SlotFields rows={asRows("socrates", intake.socrates)} onCorrect={onCorrect} />
         <SlotFields rows={asRows("ros", intake.ros)} onCorrect={onCorrect} />
         <SlotFields rows={asRows("history", intake.history)} onCorrect={onCorrect} />
       </section>
-      <section className="border-t border-graphite pt-4">
-        <h3 className="text-xl">Ahara-Vihara</h3>
+      <section className="p-5 rounded-2xl bg-white border border-slate-200/80 space-y-2">
+        <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Lifestyle</p>
+        <h3 className="text-sm font-bold text-slate-900">Ahara-Vihara</h3>
         <SlotFields rows={asRows("aharaVihara", intake.aharaVihara ?? {})} onCorrect={onCorrect} />
       </section>
     </div>

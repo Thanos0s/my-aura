@@ -154,9 +154,9 @@ export const saveCarePlan = mutation({
   },
   returns: v.id("carePlans"),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
-    if (args.status === "approved" && user.role !== "practitioner") {
-      throw new Error("Only the practitioner may approve a care plan");
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
+    if (args.status === "approved" && user.role !== "practitioner" && user.role !== "admin") {
+      throw new Error("Only the practitioner or admin may approve a care plan");
     }
     const now = Date.now();
     if (args.planId) {
@@ -534,7 +534,7 @@ export const savePractitionerNote = mutation({
   },
   returns: v.id("practitionerNotes"),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     return await ctx.db.insert("practitionerNotes", {
       patientId: args.patientId,
       visitId: args.visitId,
@@ -572,7 +572,7 @@ export const saveAyurvedaAssessment = mutation({
   },
   returns: v.id("ayurvedaAssessments"),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const visit = await ctx.db.get(args.visitId);
     if (!visit) throw new Error("Visit not found");
     const existing = await ctx.db

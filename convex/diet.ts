@@ -25,7 +25,7 @@ export const referToDietitian = mutation({
   },
   returns: v.id("referrals"),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const dietitian = await ctx.db.get(args.dietitianUserId);
     if (!dietitian || dietitian.role !== "dietitian" || !dietitian.active) {
       throw new Error("Dietitian not found");
@@ -160,7 +160,7 @@ export const approveDietPlan = mutation({
   args: { ...session, planId: v.id("dietPlans"), approved: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    const user = await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const plan = await ctx.db.get(args.planId);
     if (!plan) throw new Error("Diet plan not found");
     await ctx.db.patch(args.planId, {

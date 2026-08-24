@@ -193,7 +193,7 @@ export const doctorEdit = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const visit = await ctx.db.get(args.visitId);
     if (!visit) throw new Error("Visit not found");
     await ctx.db.patch(args.visitId, {
@@ -225,7 +225,8 @@ export const approveVisit = mutation({
     anchorId: v.string(),
   }),
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
+
     const visit = await ctx.db.get(args.visitId);
     if (!visit) throw new Error("Visit not found");
     if (!visit.patientRecapConfirmed) {

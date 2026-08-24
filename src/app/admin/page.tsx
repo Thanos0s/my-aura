@@ -7,6 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { convexConfigured } from "@/app/providers";
 import { RoleGate, useAuraSession } from "@/components/useAuraSession";
 import type { Role } from "@/lib/auth/access";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export default function AdminPage() {
   if (!convexConfigured()) {
@@ -119,7 +120,7 @@ function AdminApp() {
                           : "bg-sky-100 text-sky-800"
                       }`}
                     >
-                      {a.channel === "whatsapp" ? " WhatsApp" : " Web Portal"}
+                      {a.channel === "whatsapp" ? "WhatsApp" : "Web Portal"}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
@@ -156,7 +157,7 @@ function AdminApp() {
                       className="rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800"
                       onClick={() => void setStatus({ sessionUserId, appointmentId: a._id, status: "confirmed" })}
                     >
-                      ✓ Confirm
+                      Confirm
                     </button>
                   )}
                   {a.status !== "completed" && a.status !== "cancelled" && (
@@ -217,7 +218,7 @@ function AdminApp() {
                       {p.lastStatus}
                     </p>
                   </div>
-                  <span className="text-lg">{selectedPatient === p.patientId ? "▼" : "▶"}</span>
+                  <span className="text-slate-400">{selectedPatient === p.patientId ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</span>
                 </div>
               </button>
 
@@ -272,7 +273,7 @@ function AdminApp() {
           {users?.map((u) => (
             <li key={u._id} className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
               <span className="font-mono font-medium text-slate-800">
-                {u.email} · <span className="font-bold text-sky-800 uppercase">{u.role}</span> · {u.active ? "✓ active" : "off"}
+                {u.email} · <span className="font-bold text-sky-800 uppercase">{u.role}</span> · {u.active ? "Active" : "Disabled"}
               </span>
               <div className="flex gap-1.5">
                 {(["patient", "practitioner", "dietitian", "admin"] as Role[]).map((role) => (
@@ -298,15 +299,15 @@ function AdminApp() {
           <p className="text-xs text-slate-500">Articles and prompts. Never applied as autonomous diagnosis.</p>
         </div>
         <select
-          className="tl-input"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]"
           value={kbKind}
           onChange={(e) => setKbKind(e.target.value as "article" | "prompt")}
         >
           <option value="article">article</option>
           <option value="prompt">prompt</option>
         </select>
-        <input className="tl-input" placeholder="Title" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)} />
-        <textarea className="tl-input" rows={3} value={kbBody} onChange={(e) => setKbBody(e.target.value)} placeholder="Content / guidelines..." />
+        <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]" placeholder="Title" value={kbTitle} onChange={(e) => setKbTitle(e.target.value)} />
+        <textarea className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]" rows={3} value={kbBody} onChange={(e) => setKbBody(e.target.value)} placeholder="Content / guidelines..." />
         <button
           className="btn-pulse px-4 py-2 text-xs font-semibold"
           onClick={async () => {
@@ -380,8 +381,8 @@ function IssueBox({ sessionUserId }: { sessionUserId: Id<"users"> }) {
   const [body, setBody] = useState("");
   return (
     <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3">
-      <input className="tl-input" placeholder="Issue title..." value={title} onChange={(e) => setTitle(e.target.value)} />
-      <textarea className="tl-input" rows={2} placeholder="Describe the problem or clinical anomaly..." value={body} onChange={(e) => setBody(e.target.value)} />
+      <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]" placeholder="Issue title..." value={title} onChange={(e) => setTitle(e.target.value)} />
+      <textarea className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#1b343f]" rows={2} placeholder="Describe the problem or clinical anomaly..." value={body} onChange={(e) => setBody(e.target.value)} />
       <button
         className="btn-pulse px-4 py-1.5 text-xs font-semibold"
         onClick={async () => {

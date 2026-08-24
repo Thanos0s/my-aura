@@ -1034,7 +1034,7 @@ export function KioskWizard({
                     className="btn-pulse flex-1 py-3 text-xs font-bold text-white"
                     onClick={() => void beginClinical()}
                   >
-                    🚀 Start AI Case Taking Questions →
+                    Start AI Case Taking Questions →
                   </button>
                 </div>
               </div>
@@ -1577,7 +1577,7 @@ export function KioskWizard({
                   href="/practitioner"
                   className="btn-pulse w-full py-3 text-xs font-bold text-center block text-white"
                 >
-                  👨‍⚕️ View Doctor OPD Console →
+                  View Doctor OPD Console →
                 </Link>
               )}
             </div>

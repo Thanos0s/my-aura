@@ -61,7 +61,7 @@ export const reviewExtract = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireRole(ctx, args.sessionUserId, ["practitioner"]);
+    await requireRole(ctx, args.sessionUserId, ["practitioner", "admin"]);
     const row = await ctx.db.get(args.extractId);
     if (!row) throw new Error("Extract not found");
     await ctx.db.patch(args.extractId, {
