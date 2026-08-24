@@ -19,6 +19,8 @@ import { detectSarvamLanguageCode, SARVAM_LANGUAGES } from "@/lib/sarvam/languag
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
 import type { DocumentExtractMeta, DocumentKind } from "@/lib/documents/metadata";
 import { DocumentPipelineRail, IntakePipelineRail } from "@/components/PipelineRails";
+import { computeRms, VAD_CONFIG, sanitizeForSpeech } from "@/lib/voice/vad";
+
 
 
 import {
@@ -240,7 +242,8 @@ export function KioskWizard({
 
   async function speak(text: string, onDone?: () => void) {
     stopSpeaking();
-    if (!text || !text.trim()) {
+    const cleanText = sanitizeForSpeech(text);
+    if (!cleanText) {
       if (onDone) onDone();
       return;
     }
@@ -249,8 +252,9 @@ export function KioskWizard({
       const res = await fetch("/api/sarvam/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, languageCode: state.languageCode || "en-IN" }),
+        body: JSON.stringify({ text: cleanText, languageCode: state.languageCode || "en-IN" }),
       });
+
       const data = (await res.json()) as { audioBase64?: string | null };
       if (data.audioBase64) {
         const audio = new Audio(`data:audio/wav;base64,${data.audioBase64}`);
@@ -406,10 +410,22 @@ export function KioskWizard({
     setMessage("");
 
     const timer = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    let audioCtx: AudioContext | null = null;
+    let vadInterval: NodeJS.Timeout | null = null;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
+
+      // Voice Activity Detection setup
+      const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioCtx = new AudioCtx();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const dataArray = new Uint8Array(analyser.fftSize);
+
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       const chunks: BlobPart[] = [];
@@ -423,15 +439,49 @@ export function KioskWizard({
 
       recorder.start();
 
-      // Auto-stop after 5.5s if not stopped earlier by user
-      const timeoutId = setTimeout(() => {
+      let speechDetected = false;
+      let silenceStart: number | null = null;
+      const listenStart = Date.now();
+
+      // Real-time VAD audio energy polling
+      vadInterval = setInterval(() => {
+        if (recorder.state !== "recording") return;
+        analyser.getByteTimeDomainData(dataArray);
+        const rms = computeRms(dataArray);
+        const now = Date.now();
+
+        if (rms >= VAD_CONFIG.voiceThreshold) {
+          speechDetected = true;
+          silenceStart = null;
+        } else if (speechDetected) {
+          if (!silenceStart) {
+            silenceStart = now;
+          } else if (now - silenceStart >= VAD_CONFIG.silenceTimeoutMs) {
+            // Natural pause / end of utterance detected by VAD
+            if (recorder.state === "recording") {
+              recorder.stop();
+            }
+          }
+        } else if (now - listenStart >= VAD_CONFIG.maxWaitForSpeechMs) {
+          // No speech detected within wait window
+          if (recorder.state === "recording") {
+            recorder.stop();
+          }
+        }
+      }, 50);
+
+      // Hard safety timeout
+      const hardCapTimeout = setTimeout(() => {
         if (recorder.state === "recording") {
           recorder.stop();
         }
-      }, 5500);
+      }, VAD_CONFIG.maxRecordingMs);
 
       await stoppedPromise;
-      clearTimeout(timeoutId);
+      clearTimeout(hardCapTimeout);
+      if (vadInterval) clearInterval(vadInterval);
+      if (audioCtx) void audioCtx.close();
+
       stream.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
       mediaRecorderRef.current = null;
@@ -472,6 +522,8 @@ export function KioskWizard({
       await handleAnswerSubmit(recognized);
 
     } catch {
+      if (vadInterval) clearInterval(vadInterval);
+      if (audioCtx) void audioCtx.close();
       clearInterval(timer);
       setIsRecording(false);
       setState((s) => ({ ...s, offlineMode: true }));
@@ -486,6 +538,7 @@ export function KioskWizard({
   }
 
   async function submitTyped() {
+
     if (!typed.trim()) return;
     await handleAnswerSubmit(typed.trim());
   }

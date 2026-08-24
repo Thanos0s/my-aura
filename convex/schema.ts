@@ -229,9 +229,25 @@ export default defineSchema({
     ),
     patientPhone: v.optional(v.string()),
     createdAt: v.number(),
+    // Location-aware dynamic queue optimization — all optional so existing
+    // simple (non-geo) bookings keep working untouched.
+    geo: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    address: v.optional(v.string()),
+    pinCode: v.optional(v.string()),
+    consultationType: v.optional(
+      v.union(v.literal("HOME_VISIT"), v.literal("CLINIC_OPD"), v.literal("TELECONSULT"))
+    ),
+    urgency: v.optional(
+      v.union(v.literal("ROUTINE"), v.literal("PRIORITY"), v.literal("EMERGENCY"))
+    ),
+    preferredWindowStart: v.optional(v.number()),
+    preferredWindowEnd: v.optional(v.number()),
+    estimatedConsultMinutes: v.optional(v.number()),
+    delayMinutes: v.optional(v.number()),
   })
     .index("by_patient", ["patientId"])
     .index("by_practitioner", ["practitionerUserId"]),
+
 
   messages: defineTable({
     patientId: v.id("patients"),

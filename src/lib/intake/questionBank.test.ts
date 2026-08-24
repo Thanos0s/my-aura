@@ -201,4 +201,38 @@ describe("Chief-complaint question bank", () => {
     expect(summary).toContain("Around navel");
     expect(summary).toContain("Spicy food");
   });
+
+  it("strictly enforces maximum 6 total questions and terminates to complete", () => {
+    let state = createInitialState("hi-IN");
+    state = { ...state, phase: "socrates" };
+
+    // Turn 1: Chief Complaint
+    state = applySlotAnswer(state, "socrates", "chiefComplaint", "पेट में दर्द");
+    expect(nextQuestion(state).kind).toBe("ask");
+
+    // Turn 2: Location
+    state = applySlotAnswer(state, "socrates", "character_location", "ऊपरी पेट");
+    expect(nextQuestion(state).kind).toBe("ask");
+
+    // Turn 3: Trigger
+    state = applySlotAnswer(state, "socrates", "trigger", "खाना खाने के बाद");
+    expect(nextQuestion(state).kind).toBe("ask");
+
+    // Turn 4: Onset
+    state = applySlotAnswer(state, "socrates", "onset", "दो दिनों से");
+    expect(nextQuestion(state).kind).toBe("ask");
+
+    // Turn 5: Medication
+    state = applySlotAnswer(state, "socrates", "medication", "कोई दवा नहीं ली");
+    expect(nextQuestion(state).kind).toBe("ask");
+
+    // Turn 6: Pattern
+    state = applySlotAnswer(state, "socrates", "pattern", "पहली बार हुआ है");
+
+    // Turn 6 reached: nextQuestion MUST return complete!
+    const finish = nextQuestion(state);
+    expect(finish.kind).toBe("complete");
+    expect(state.chatHistory?.length).toBe(6);
+  });
 });
+

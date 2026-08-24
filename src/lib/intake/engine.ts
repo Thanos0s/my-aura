@@ -587,6 +587,12 @@ export function nextQuestion(state: IntakeState): Prompt {
     return { kind: "complete" };
   }
 
+  // ─── STRICT 6-QUESTION CEILING: Always complete after 6 total exchanges ───────
+  const totalChatTurns = (state.chatHistory ?? []).length;
+  if (totalChatTurns >= 6) {
+    return { kind: "complete" };
+  }
+
   // ─── 1. SOCRATES & CHIEF COMPLAINT FLOW ────────────────────────────────────
   if (state.phase === "socrates") {
     // If chief complaint not filled, ask the opening question
@@ -627,7 +633,7 @@ export function nextQuestion(state: IntakeState): Prompt {
 
       // Skip fields already present in chat / complaint answers
       const qIndex = firstUnansweredComplaintIndex(complaint, answered, 0);
-      if (qIndex < complaint.questions.length) {
+      if (qIndex < complaint.questions.length && totalChatTurns < 6) {
         const q = complaint.questions[qIndex];
         if (q) {
           return {
@@ -645,30 +651,18 @@ export function nextQuestion(state: IntakeState): Prompt {
         return { kind: "escalated", reason: complaint.id };
       }
 
-      // All complaint questions completed!
-      if (state.pathway === "ayush") {
-        return nextQuestion({
-          ...state,
-          phase: "dashavidha",
-          matchedComplaintId: matchedId,
-        });
-      }
-
-      // Standard OPD: done — never drip into systemic ROS after complaint bank interview
+      // All complaint questions completed or limit reached: strictly complete!
       return { kind: "complete" };
     }
 
-    // Already ran a complaint-style interview but lost matched id — do NOT restart ROS
+    // Already ran a complaint-style interview but lost matched id — complete
     if (hadComplaintInterview) {
-      if (state.pathway === "ayush") {
-        return nextQuestion({ ...state, phase: "dashavidha" });
-      }
       return { kind: "complete" };
     }
 
     // Legacy SOCRATES fallback (only when no complaint interview happened)
     for (const key of SOCRATES_ORDER) {
-      if (!isFilled(state.socrates[key])) {
+      if (!isFilled(state.socrates[key]) && totalChatTurns < 6) {
         const p = getPromptTranslation(key, lang);
         return {
           kind: "ask",
@@ -679,8 +673,13 @@ export function nextQuestion(state: IntakeState): Prompt {
         };
       }
     }
-    return nextQuestion({ ...state, phase: "ros" });
+    if (!hadComplaintInterview) {
+      return nextQuestion({ ...state, phase: "ros" });
+    }
+    return { kind: "complete" };
   }
+
+
 
   // ─── 2. ROS (Clinical Review of Systems) ───────────────────────────────────
   if (state.phase === "ros") {
@@ -965,34 +964,39 @@ export function canCompleteIntake(state: IntakeState): { ok: boolean; reasons: s
   if (!isFilled(state.socrates.chiefComplaint)) {
     reasons.push("chief complaint must be recorded");
   }
-  if (!isFilled(state.history.currentMedicines)) {
-    reasons.push("current medicines must be filled (or none known)");
-  }
-  if (!isFilled(state.history.allergies)) {
-    reasons.push("allergies must be filled (or none known)");
-  }
-  if (state.pathway === "ayush") {
-    const dash = normalizeDashavidha(state.dashavidha);
-    for (const key of DASHAVIDHA_ORDER) {
-      if (!isFilled(dash[key])) {
-        reasons.push(`Dashavidha ${key} unanswered — mark clinician to assess or answer`);
+  const isChatbotFlow = (state.chatHistory ?? []).length > 0 || Boolean(state.matchedComplaintId);
+  if (!isChatbotFlow) {
+    if (!isFilled(state.history.currentMedicines)) {
+      reasons.push("current medicines must be filled (or none known)");
+    }
+    if (!isFilled(state.history.allergies)) {
+      reasons.push("allergies must be filled (or none known)");
+    }
+    if (state.pathway === "ayush") {
+      const dash = normalizeDashavidha(state.dashavidha);
+      for (const key of DASHAVIDHA_ORDER) {
+        if (!isFilled(dash[key])) {
+          reasons.push(`Dashavidha ${key} unanswered — mark clinician to assess or answer`);
+        }
       }
     }
-  }
-  for (const q of RED_FLAG_QUESTIONS) {
-    if (state.redFlags[q.id] === null || state.redFlags[q.id] === undefined) {
-      reasons.push("red-flag screening incomplete");
-      break;
+    for (const q of RED_FLAG_QUESTIONS) {
+      if (state.redFlags[q.id] === null || state.redFlags[q.id] === undefined) {
+        reasons.push("red-flag screening incomplete");
+        break;
+      }
     }
-  }
-  const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
-  for (const key of AHARA_VIHARA_ORDER) {
-    if (!isFilled(ahara[key])) {
-      reasons.push(`Ahara-Vihara ${key} unanswered`);
+    const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
+    for (const key of AHARA_VIHARA_ORDER) {
+      if (!isFilled(ahara[key])) {
+        reasons.push(`Ahara-Vihara ${key} unanswered`);
+      }
     }
   }
   return { ok: reasons.length === 0, reasons };
 }
+
+
 
 export function plainLanguageRecap(state: IntakeState): string {
   const cc = state.socrates.chiefComplaint.value || "not stated";
