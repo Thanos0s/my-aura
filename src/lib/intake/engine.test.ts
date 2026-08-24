@@ -279,4 +279,55 @@ describe("canonical AYUSH spine", () => {
     expect(recap).toMatch(/8 glasses/);
     expect(recap).toMatch(/tea twice a day/);
   });
+
+  it("asks 6 complaint questions then transitions to all 10 Dashavidha factors in exact order on AYUSH pathway", () => {
+    let visit = afterPatientState("ayush");
+    
+    // 1. Initial Chief complaint
+    let q = nextQuestion(visit);
+    expect(q.kind).toBe("ask");
+    expect(q.id).toBe("chiefComplaint");
+    
+    visit = applySlotAnswer(visit, "socrates", "chiefComplaint", "I have severe joint pain and swelling for 2 weeks");
+    
+    // Up to 5 more targeted complaint questions (total 6 turns for the problem)
+    for (let i = 0; i < 5; i++) {
+      q = nextQuestion(visit);
+      expect(q.kind).toBe("ask");
+      if (q.kind === "ask") {
+        visit = applySlotAnswer(visit, q.group, q.id, `Answer for problem step ${i + 1}`);
+      }
+    }
+    
+    // Now transitions into Dashavidha phase!
+    // Must ask all 10 factors in exact order:
+    // 01 prakriti, 02 vikriti, 03 agni, 04 satva, 05 sara, 06 samhanana, 07 pramana, 08 satmya, 09 vyayamaShakti, 10 vaya
+    const expectedDashavidha = [
+      "prakriti",
+      "vikriti",
+      "agni",
+      "satva",
+      "sara",
+      "samhanana",
+      "pramana",
+      "satmya",
+      "vyayamaShakti",
+      "vaya",
+    ];
+
+    for (const factor of expectedDashavidha) {
+      q = nextQuestion(visit);
+      expect(q.kind).toBe("ask");
+      if (q.kind === "ask") {
+        expect(q.group).toBe("dashavidha");
+        expect(q.id).toBe(factor);
+        visit = applySlotAnswer(visit, "dashavidha", factor, `Patient assessment for ${factor}`);
+      }
+    }
+
+    // After all 10 Dashavidha factors, intake is complete!
+    q = nextQuestion(visit);
+    expect(q.kind).toBe("complete");
+  });
 });
+

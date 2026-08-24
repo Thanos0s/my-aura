@@ -587,12 +587,6 @@ export function nextQuestion(state: IntakeState): Prompt {
     return { kind: "complete" };
   }
 
-  // ─── STRICT 6-QUESTION CEILING: Always complete after 6 total exchanges ───────
-  const totalChatTurns = (state.chatHistory ?? []).length;
-  if (totalChatTurns >= 6) {
-    return { kind: "complete" };
-  }
-
   // ─── 1. SOCRATES & CHIEF COMPLAINT FLOW ────────────────────────────────────
   if (state.phase === "socrates") {
     // If chief complaint not filled, ask the opening question
@@ -607,6 +601,18 @@ export function nextQuestion(state: IntakeState): Prompt {
           ? ["पेट दर्द", "सिरदर्द", "बुखार", "खांसी और जुकाम", "कमर दर्द", "जोड़ों का दर्द", "दस्त", "उल्टी / जी मिचलाना", "सीने में दर्द", "चक्कर / कमजोरी"]
           : ["Stomach ache", "Headache", "Fever", "Cough & Cold", "Back pain", "Joint / Body pain", "Diarrhea", "Vomiting", "Chest pain", "Dizziness / Weakness"],
       };
+    }
+
+    const socratesTurns = (state.chatHistory ?? []).filter(
+      (e) => !DASHAVIDHA_ORDER.includes(e.field as DashavidhaKey)
+    ).length;
+
+    // Strict 6-question limit for the complaint / problem interview
+    if (socratesTurns >= 6) {
+      if (state.pathway === "ayush") {
+        return nextQuestion({ ...state, phase: "dashavidha" });
+      }
+      return { kind: "complete" };
     }
 
     const hadComplaintInterview =
@@ -633,7 +639,7 @@ export function nextQuestion(state: IntakeState): Prompt {
 
       // Skip fields already present in chat / complaint answers
       const qIndex = firstUnansweredComplaintIndex(complaint, answered, 0);
-      if (qIndex < complaint.questions.length && totalChatTurns < 6) {
+      if (qIndex < complaint.questions.length && socratesTurns < 6) {
         const q = complaint.questions[qIndex];
         if (q) {
           return {
@@ -651,18 +657,30 @@ export function nextQuestion(state: IntakeState): Prompt {
         return { kind: "escalated", reason: complaint.id };
       }
 
-      // All complaint questions completed or limit reached: strictly complete!
+      // 6-question problem interview completed!
+      if (state.pathway === "ayush") {
+        return nextQuestion({
+          ...state,
+          phase: "dashavidha",
+          matchedComplaintId: matchedId,
+        });
+      }
+
+      // Standard Allopathic OPD: complete
       return { kind: "complete" };
     }
 
-    // Already ran a complaint-style interview but lost matched id — complete
-    if (hadComplaintInterview) {
+    // Already ran a complaint-style interview but lost matched id
+    if (hadComplaintInterview || socratesTurns >= 6) {
+      if (state.pathway === "ayush") {
+        return nextQuestion({ ...state, phase: "dashavidha" });
+      }
       return { kind: "complete" };
     }
 
     // Legacy SOCRATES fallback (only when no complaint interview happened)
     for (const key of SOCRATES_ORDER) {
-      if (!isFilled(state.socrates[key]) && totalChatTurns < 6) {
+      if (!isFilled(state.socrates[key]) && socratesTurns < 6) {
         const p = getPromptTranslation(key, lang);
         return {
           kind: "ask",
@@ -673,15 +691,37 @@ export function nextQuestion(state: IntakeState): Prompt {
         };
       }
     }
+
     if (!hadComplaintInterview) {
       return nextQuestion({ ...state, phase: "ros" });
+    }
+    if (state.pathway === "ayush") {
+      return nextQuestion({ ...state, phase: "dashavidha" });
     }
     return { kind: "complete" };
   }
 
+  // ─── 2. AYUSH DASHAVIDHA ASSESSMENT (10 AYURVEDIC PILLARS) ───────────────────
+  if (state.phase === "dashavidha") {
+    const dash = normalizeDashavidha(state.dashavidha);
+    for (const key of DASHAVIDHA_ORDER) {
+      if (!isFilled(dash[key])) {
+        const p = getPromptTranslation(key, lang);
+        return { kind: "ask", group: "dashavidha", id: key, text: p.text, chips: p.chips };
+      }
+    }
+    const hadComplaintInterview =
+      Boolean(state.matchedComplaintId) ||
+      Object.keys(state.complaintAnswers ?? {}).length > 0 ||
+      (state.chatHistory ?? []).length > 0;
+    if (hadComplaintInterview) {
+      return { kind: "complete" };
+    }
+    return nextQuestion({ ...state, phase: "aharaVihara" });
+  }
 
 
-  // ─── 2. ROS (Clinical Review of Systems) ───────────────────────────────────
+  // ─── 3. ROS (Clinical Review of Systems) ───────────────────────────────────
   if (state.phase === "ros") {
     for (const key of ROS_ORDER) {
       if (!isFilled(state.ros[key])) {
@@ -695,17 +735,6 @@ export function nextQuestion(state: IntakeState): Prompt {
     return nextQuestion({ ...state, phase: "aharaVihara" });
   }
 
-  // ─── 3. AYUSH DASHAVIDHA ASSESSMENT ────────────────────────────────────────
-  if (state.phase === "dashavidha") {
-    const dash = normalizeDashavidha(state.dashavidha);
-    for (const key of DASHAVIDHA_ORDER) {
-      if (!isFilled(dash[key])) {
-        const p = getPromptTranslation(key, lang);
-        return { kind: "ask", group: "dashavidha", id: key, text: p.text, chips: p.chips };
-      }
-    }
-    return nextQuestion({ ...state, phase: "aharaVihara" });
-  }
 
   // ─── 4. AHARA-VIHARA (LIFESTYLE) ───────────────────────────────────────────
   if (state.phase === "aharaVihara") {
@@ -921,11 +950,25 @@ export function applySlotAnswer(
   if (group === "dashavidha") {
     const key = id as DashavidhaKey;
     const dash = normalizeDashavidha(state.dashavidha);
+    const p = getPromptTranslation(key, state.languageCode || "en-IN");
+    const exchange: ChatExchange = {
+      id: `dash-${key}-${Date.now()}`,
+      question: p.text,
+      answer: value,
+      field: key,
+      timestamp: Date.now(),
+    };
+    const newChatHistory = [...(state.chatHistory ?? []), exchange];
+    const updatedDash = { ...dash, [key]: fillSlot(source, value, 1) };
+    const allFilled = DASHAVIDHA_ORDER.every((k) => isFilled(updatedDash[k]));
     return {
       ...state,
-      dashavidha: { ...dash, [key]: fillSlot(source, value, 1) },
+      phase: allFilled ? "documents" : "dashavidha",
+      dashavidha: updatedDash,
+      chatHistory: newChatHistory,
     };
   }
+
   const key = id as AharaViharaKey;
   const ahara = state.aharaVihara ?? mapFrom(AHARA_VIHARA_ORDER);
   return {

@@ -1094,29 +1094,49 @@ export function KioskWizard({
             </div>
 
             {/* Dashavidha Indicator (If running Ayurvedic assessment) */}
-            {prompt.group === "dashavidha" && (
-              <div className="rounded-2xl bg-emerald-50/70 p-3 border border-emerald-200/80 space-y-1.5">
-                <p className="font-mono text-[10px] font-bold text-emerald-950 uppercase tracking-wider">
-                  Dashavidha Pariksha Factor Checklist (10 Ayurvedic Pillars):
+            {(prompt.group === "dashavidha" || state.phase === "dashavidha") && (
+              <div className="rounded-2xl bg-emerald-50/80 p-3.5 border border-emerald-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                    Dashavidha · 10 factors
+                  </p>
+                  <span className="font-mono text-xs font-bold text-emerald-800 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-xs">
+                    {DASHAVIDHA_FACTORS.filter((f) => isFilled(state.dashavidha[f.key])).length}/10 answered
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800 font-medium">
+                  No automatic dosha labels. Clinician interprets.
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-                  {DASHAVIDHA_FACTORS.map((factor, i) => (
-                    <div
-                      key={factor.key}
-                      className={`p-1.5 rounded-xl text-[10px] font-mono border ${
-                        prompt.id === factor.key
-                          ? "bg-emerald-700 text-white border-emerald-800 font-bold"
-                          : isFilled(state.dashavidha[factor.key])
-                          ? "bg-white text-emerald-900 border-emerald-200 font-semibold"
-                          : "bg-white/60 text-slate-400 border-slate-100"
-                      }`}
-                    >
-                      <span>{String(i + 1).padStart(2, "0")} {factor.label}</span>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 pt-1">
+                  {DASHAVIDHA_FACTORS.map((factor, i) => {
+                    const filled = isFilled(state.dashavidha[factor.key]);
+                    const isCurrent = prompt.id === factor.key;
+                    return (
+                      <div
+                        key={factor.key}
+                        className={`p-2 rounded-xl text-[10px] border transition-all ${
+                          isCurrent
+                            ? "bg-[#1b343f] text-white border-[#1b343f] font-bold shadow-xs"
+                            : filled
+                            ? "bg-emerald-100/90 text-emerald-950 border-emerald-300 font-semibold"
+                            : "bg-white/80 text-slate-400 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[9px]">{String(i + 1).padStart(2, "0")}</span>
+                          {filled && <span className="text-emerald-700 font-bold">✓</span>}
+                        </div>
+                        <p className="font-bold mt-0.5">{factor.label}</p>
+                        <p className={`text-[9px] line-clamp-1 mt-0.5 ${isCurrent ? "text-slate-200" : filled ? "text-emerald-800" : "text-slate-400"}`}>
+                          {filled ? state.dashavidha[factor.key].value : "—"}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
+
 
             {/* ─── Conversational Point-Wise Chatbot Thread ─────────────────── */}
             <div className="rounded-3xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-3 max-h-[420px] overflow-y-auto">
