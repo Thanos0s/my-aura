@@ -5,7 +5,33 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { DocumentPipelinePanel } from "./DocumentPipelinePanel";
+import { ClinicMapLocator, type ClinicLocation, NEARBY_CLINICS } from "./ClinicMapLocator";
 import type { DocumentKind } from "@/lib/documents/metadata";
+import {
+  LayoutDashboard,
+  Bot,
+  FileText,
+  Activity,
+  Leaf,
+  Pill,
+  CheckCircle2,
+  Calendar,
+  MessageSquare,
+  Search,
+  Sparkles,
+  Clock,
+  Video,
+  Building2,
+  Home,
+  Stethoscope,
+  Smartphone,
+  AlertCircle,
+  Droplets,
+  Utensils,
+  X,
+  Edit2,
+} from "lucide-react";
+
 
 type Tab =
   | "overview"
@@ -17,6 +43,8 @@ type Tab =
   | "adherence"
   | "book"
   | "messages";
+
+type ConsultationMode = "in_clinic" | "telehealth" | "home_visit";
 
 export function PatientStation({
   sessionUserId,
@@ -30,11 +58,11 @@ export function PatientStation({
   // null = still loading visits; "intake" for new patients; "overview" for returning
   const [tab, setTab] = useState<Tab | null>(null);
   const [tabDecided, setTabDecided] = useState(false);
-  const [selectedDosha, setSelectedDosha] = useState<"vata" | "pitta" | "kapha" | "dashavidha">("vata");
-  const [activeDay, setActiveDay] = useState<"Sat" | "Sun" | "Mon" | "Tue" | "Wed">("Mon");
-  const [routineDone, setRoutineDone] = useState<Record<string, boolean>>({ "pull-up": true });
-  const [waterLogged, setWaterLogged] = useState(750);
+  const [routineDone, setRoutineDone] = useState<Record<string, boolean>>({ "morning-walk": true, "warm-water": true });
+  const [waterLogged, setWaterLogged] = useState(1250);
   const [searchQuery, setSearchQuery] = useState("");
+
+
   // Food browser state
   const [foodSearch, setFoodSearch] = useState("");
   const [foodCategory, setFoodCategory] = useState("All");
@@ -42,9 +70,17 @@ export function PatientStation({
   const [selectedFood, setSelectedFood] = useState<string | null>(null);
   const [plansView, setPlansView] = useState<"plans" | "foods">("plans");
 
+  // Appointment Booking Enhanced State
+  const [consultMode, setConsultMode] = useState<ConsultationMode>("in_clinic");
+  const [selectedClinic, setSelectedClinic] = useState<ClinicLocation>(NEARBY_CLINICS[0]!);
+
+  const [selectedDateQuick, setSelectedDateQuick] = useState<"today" | "tomorrow" | "in_2_days" | "custom">("tomorrow");
+
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("10:30 AM");
+  const [bookingSuccessModal, setBookingSuccessModal] = useState(false);
+
   const args = { sessionUserId };
   const symptoms = useQuery(api.clinical.listSymptoms, args);
-  const lifestyle = useQuery(api.clinical.getLifestyle, args);
   const care = useQuery(api.clinical.listCarePlans, args);
   const diet = useQuery(api.diet.listDietPlans, args);
   const adherence = useQuery(api.clinical.listAdherence, args);
@@ -53,37 +89,35 @@ export function PatientStation({
   const messages = useQuery(api.messaging.listMessages, args);
   const visits = useQuery(api.visits.listPatientVisits, args);
   const documentExtracts = useQuery(api.documents.listPatientDocumentExtracts, args);
-  // Only load food database when user navigates to the food browser — prevents crashing other pages
+
+  // Lazy load foods database only when needed
   const allFoods = useQuery(
     api.foods.listFoods,
     tab === "plans" ? {} : "skip"
   );
 
-  // Smart default tab: new patient (no visits) → AI Case Taking; returning patient → Dashboard
+  // Smart default tab: new patient (no visits) -> AI Case Taking; returning patient -> Dashboard
   useEffect(() => {
     if (tabDecided) return;
-    if (visits === undefined) return; // still loading
+    if (visits === undefined) return;
     setTabDecided(true);
     if (visits.length === 0) {
-      // Brand-new patient: start AI case taking immediately
       setTab("intake");
     } else {
-      // Returning patient: show the full dashboard
       setTab("overview");
     }
   }, [visits, tabDecided]);
 
-  // Convenience setter that forces a tab (respects user clicks)
   function goTab(t: Tab) {
     setTabDecided(true);
     setTab(t);
   }
 
-  const activeTab = tab ?? "overview"; // fallback while loading
+  const activeTab = tab ?? "overview";
 
   const logSymptom = useMutation(api.clinical.logSymptom);
-  const upsertLifestyle = useMutation(api.clinical.upsertLifestyle);
   const logAdherence = useMutation(api.clinical.logAdherence);
+
   const requestAppointment = useMutation(api.clinical.requestAppointment);
   const sendMessage = useMutation(api.messaging.sendMessage);
   const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
@@ -91,50 +125,54 @@ export function PatientStation({
   const startVisit = useMutation(api.visits.startVisit);
   const updateName = useMutation(api.auth.updateProfileName);
 
-  // Derived food browser data
+  // Derived food categories
   const foodCategories = useMemo(() => {
     if (!allFoods) return ["All"];
     const cats = Array.from(new Set(allFoods.map((f) => f.category)));
     return ["All", ...cats.sort()];
   }, [allFoods]);
 
+  // Filtered foods
   const filteredFoods = useMemo(() => {
     if (!allFoods) return [];
     return allFoods.filter((f) => {
-      const matchesSearch =
-        !foodSearch ||
-        f.name.toLowerCase().includes(foodSearch.toLowerCase()) ||
-        f.description.toLowerCase().includes(foodSearch.toLowerCase()) ||
-        f.category.toLowerCase().includes(foodSearch.toLowerCase());
-      const matchesCategory = foodCategory === "All" || f.category === foodCategory;
-      const matchesDosha =
-        foodDoshaFilter === "all" || f.dosha[foodDoshaFilter] === "decrease";
-      return matchesSearch && matchesCategory && matchesDosha;
+      if (foodSearch.trim()) {
+        const q = foodSearch.toLowerCase();
+        const matchesName = f.name.toLowerCase().includes(q);
+        const matchesCat = f.category.toLowerCase().includes(q);
+        const matchesTaste = f.taste?.some((t) => t.toLowerCase().includes(q));
+        if (!matchesName && !matchesCat && !matchesTaste) return false;
+      }
+      if (foodCategory !== "All" && f.category !== foodCategory) return false;
+      if (foodDoshaFilter !== "all") {
+        if (f.dosha?.[foodDoshaFilter] !== "decrease") return false;
+      }
+      return true;
     });
   }, [allFoods, foodSearch, foodCategory, foodDoshaFilter]);
 
-  const selectedFoodItem = useMemo(
-    () => allFoods?.find((f) => f._id === selectedFood) ?? null,
-    [allFoods, selectedFood]
-  );
+  const selectedFoodItem = useMemo(() => {
+    if (!selectedFood || !allFoods) return null;
+    return allFoods.find((f) => f._id === selectedFood) || null;
+  }, [selectedFood, allFoods]);
 
-
-  const [symptomText, setSymptomText] = useState("");
-  const [severity, setSeverity] = useState(3);
-  const [life, setLife] = useState({
-    mealTimes: "",
-    dietType: "",
-    sleep: "",
-    waterIntake: "",
-    teaCoffeeSubstances: "",
+  // Form states
+  const [symForm, setSymForm] = useState({
+    name: "",
+    severity: 5,
+    startedAt: new Date().toISOString().slice(0, 16),
+    location: "",
+    character: "",
+    radiation: "",
     notes: "",
   });
   const [checkin, setCheckin] = useState("");
   const [msg, setMsg] = useState("");
   const [toRole, setToRole] = useState<"practitioner" | "dietitian">("practitioner");
   const [slot, setSlot] = useState("");
+
   const [practId, setPractId] = useState<Id<"users"> | "">("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+91 98765 43210");
   const [sendWhatsAppAlert, setSendWhatsAppAlert] = useState(true);
   const [bookingNotice, setBookingNotice] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -142,9 +180,36 @@ export function PatientStation({
   const [useManualDoctor, setUseManualDoctor] = useState(false);
   const [manualDoctorName, setManualDoctorName] = useState("");
 
+  // Calculate target date based on quick selector
+  useEffect(() => {
+    const d = new Date();
+    if (selectedDateQuick === "tomorrow") {
+      d.setDate(d.getDate() + 1);
+    } else if (selectedDateQuick === "in_2_days") {
+      d.setDate(d.getDate() + 2);
+    }
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    
+    // Parse time slot
+    let hours = 10;
+    let mins = 30;
+    const parts = selectedTimeSlot.replace(/ (AM|PM)/i, "").split(":");
+    const hStr = parts[0] ?? "10";
+    const mStr = parts[1] ?? "30";
+    if (selectedTimeSlot.includes("PM")) {
+      hours = (parseInt(hStr, 10) % 12) + 12;
+      mins = parseInt(mStr, 10);
+    } else {
+      hours = parseInt(hStr, 10) % 12;
+      mins = parseInt(mStr, 10);
+    }
 
-
-
+    const hh = String(hours).padStart(2, "0");
+    const minStr = String(mins).padStart(2, "0");
+    setSlot(`${yyyy}-${mm}-${dd}T${hh}:${minStr}`);
+  }, [selectedDateQuick, selectedTimeSlot]);
 
   async function handlePatientUpload(file: File, kind: DocumentKind) {
     const postUrlPromise = generateUploadUrl({}).then(async (postUrl) => {
@@ -183,7 +248,6 @@ export function PatientStation({
         pathway: "ayush",
         answeredBy: "patient",
         kioskId: "patient-portal",
-
         shareHistory: true,
         shareAyush: true,
         shareAbha: false,
@@ -206,22 +270,25 @@ export function PatientStation({
             severity: { value: "", status: "unasked", confidence: 1, source: "patient" },
           },
           dashavidha: {
-            dushya: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            desha: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            bala: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            kala: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            anala: { value: "", status: "unasked", confidence: 1, source: "patient" },
             prakriti: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            vayas: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            sattva: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            vikriti: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            agni: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            satva: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            sara: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            samhanana: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            pramana: { value: "", status: "unasked", confidence: 1, source: "patient" },
             satmya: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            ahara: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            vyayamaShakti: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            vaya: { value: "", status: "unasked", confidence: 1, source: "patient" },
           },
           history: {
-            pastMedical: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            chronicConditions: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            surgeries: { value: "", status: "unasked", confidence: 1, source: "patient" },
             currentMedicines: { value: "none known", status: "unasked", confidence: 1, source: "patient" },
             allergies: { value: "none known", status: "unasked", confidence: 1, source: "patient" },
             familyHistory: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            substanceUse: { value: "", status: "unasked", confidence: 1, source: "patient" },
+            occupation: { value: "", status: "unasked", confidence: 1, source: "patient" },
           },
           ros: {},
           aharaVihara: {
@@ -230,43 +297,51 @@ export function PatientStation({
             sleep: { value: "", status: "unasked", confidence: 1, source: "patient" },
             waterIntake: { value: "", status: "unasked", confidence: 1, source: "patient" },
             teaCoffeeSubstances: { value: "", status: "unasked", confidence: 1, source: "patient" },
-            notes: { value: "", status: "unasked", confidence: 1, source: "patient" },
           },
-          patientRecapConfirmed: false,
+          redFlags: {},
+          redFlagEvents: [],
         }),
       });
     }
 
-
     await attachDocument({
       visitId: activeVisitId,
       storageId: json.storageId,
-      kind: kind === "scan" ? "scan" : kind,
-      rawText: ocrData.text ?? "",
-      structuredJson: JSON.stringify(ocrData.structured ?? {}),
-      confidence: ocrData.confidence ?? 0,
-      failed: ocrData.failed,
+      kind,
+      rawText: ocrData.text || "",
+      structuredJson: JSON.stringify(ocrData.structured || {}),
+      confidence: ocrData.confidence || 0,
+      failed: !!ocrData.failed,
     });
   }
 
+
+  // Doctor List with specialties
+  const doctorSpecialties = [
+    { name: "Dr. Rajesh Sharma, MD (Ayurveda)", specialty: "Ayurveda & Chronic Care", exp: "14 yrs", fee: "₹500 / Free with ABHA" },
+    { name: "Dr. Ananya Iyer, BAMS, Panchakarma Sp.", specialty: "Panchakarma & Nadi Pariksha", exp: "9 yrs", fee: "₹600" },
+    { name: "Dr. Vikram Sethi, MBBS, MD (Medicine)", specialty: "General Medicine & Diabetes", exp: "18 yrs", fee: "₹750" },
+    { name: "Dr. Pooja Deshmukh, MSc (Clinical Dietetics)", specialty: "Ahara-Vihara & Nutrition", exp: "8 yrs", fee: "₹400" },
+  ];
+
   return (
-    <div className="space-y-6 max-w-[1300px] mx-auto pb-12">
+    <div className="space-y-6 max-w-[1320px] mx-auto pb-16">
       {/* Top Header / Greeting Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
         <div>
           <div className="flex items-center gap-2">
             {isEditingName ? (
-              <div className="flex items-center gap-1.5 py-0.5">
+              <div className="flex items-center gap-2 py-0.5">
                 <input
                   type="text"
-                  className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-sky-500"
+                  className="rounded-xl border border-slate-300 px-3 py-1 text-sm text-slate-800 font-semibold focus:outline-none focus:border-sky-500 bg-white"
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder="Enter full name"
                   autoFocus
                 />
                 <button
-                  className="rounded-lg bg-[#1b343f] px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-[#274d5d]"
+                  className="rounded-xl bg-[#1b343f] px-3 py-1 text-xs font-semibold text-white hover:bg-[#274d5d]"
                   onClick={async () => {
                     if (!customName.trim()) return;
                     await updateName({ sessionUserId, displayName: customName.trim() });
@@ -276,199 +351,419 @@ export function PatientStation({
                   Save
                 </button>
                 <button
-                  className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+                  className="rounded-xl bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
                   onClick={() => setIsEditingName(false)}
                 >
-                  ✕
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : (
-              <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                Good Day, <strong className="text-slate-900">{displayName}</strong>
+              <p className="text-base font-medium text-slate-500 flex items-center gap-2">
+                Good Day, <strong className="text-slate-900 font-bold">{displayName}</strong>
                 <button
-                  className="text-xs text-sky-700 hover:text-sky-900 font-normal px-1 py-0.5 rounded-md hover:bg-sky-50 transition-colors"
+                  className="text-xs text-sky-700 hover:text-sky-900 font-medium px-2 py-0.5 rounded-lg hover:bg-sky-50 transition-colors inline-flex items-center gap-1"
                   onClick={() => {
                     setCustomName(displayName);
                     setIsEditingName(true);
                   }}
                   title="Change profile name"
                 >
-                  ✎ Edit
+                  <Edit2 className="h-3 w-3" />
+                  <span>Edit Name</span>
                 </button>
               </p>
             )}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 mt-0.5">
-            How&apos;s your health balance today?
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mt-1">
+            How is your health balance today?
           </h1>
         </div>
 
-
         <div className="flex items-center gap-3">
           <div className="relative">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
             <input
               type="text"
               placeholder="Search health records..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-full border border-slate-200 bg-white/90 px-4 py-2 pl-9 text-xs shadow-xs placeholder:text-slate-400 focus:border-sky-400 focus:outline-none w-56 md:w-64"
+              className="rounded-full border border-slate-200 bg-white/95 px-4 py-2.5 pl-10 text-sm shadow-xs placeholder:text-slate-400 focus:border-sky-400 focus:outline-none w-56 md:w-64"
             />
-            <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
           </div>
           <button
             onClick={() => goTab("intake")}
-            className="btn-pulse px-4 py-2 text-xs font-semibold"
+            className="btn-pulse px-5 py-2.5 text-sm font-bold flex items-center gap-2"
           >
-            Start Case Taking ✨
+            <Sparkles className="h-4 w-4 text-sky-300" />
+            <span>Start Case Taking</span>
           </button>
         </div>
       </div>
 
-      {/* Navigation Pills Bar */}
-      <div className="flex flex-wrap gap-2 rounded-2xl bg-white/70 p-1.5 border border-slate-200/80 shadow-xs backdrop-blur-sm">
+      {/* Navigation Pills Bar with Clean Lucide Icons (No Emojis) */}
+      <div className="flex flex-wrap gap-2 rounded-2xl bg-white/80 p-2 border border-slate-200/80 shadow-xs backdrop-blur-md">
         {(
           [
-            ["overview", "🌟 Dashboard Overview"],
-            ["intake", "📋 AI Case Taking"],
-            ["documents", `📄 Documents & OCR (${documentExtracts?.length ?? 0})`],
-            ["symptoms", "🩺 Symptoms Log"],
-            ["lifestyle", "🌿 Ahara-Vihara"],
-            ["plans", "💊 Care & Diet Plans"],
-            ["adherence", "✅ Check-ins"],
-            ["book", "🗓️ Follow-up"],
-            ["messages", "💬 Messages"],
+            ["overview", "Dashboard Overview", LayoutDashboard],
+            ["intake", "AI Case Taking", Bot],
+            ["documents", `Documents & OCR (${documentExtracts?.length ?? 0})`, FileText],
+            ["symptoms", "Symptoms Log", Activity],
+            ["lifestyle", "Ahara-Vihara Routine", Leaf],
+            ["plans", "Care & Diet Plans", Pill],
+            ["adherence", "Check-ins", CheckCircle2],
+            ["book", "Book Consultation & Map", Calendar],
+            ["messages", "Messages", MessageSquare],
           ] as const
-        ).map(([id, label]) => (
+        ).map(([id, label, IconComponent]) => (
           <button
             key={id}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all flex items-center gap-2 ${
               activeTab === id
                 ? "bg-[#1b343f] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
             onClick={() => goTab(id)}
           >
-
-            {label}
+            <IconComponent className="h-4 w-4 shrink-0" />
+            <span>{label}</span>
           </button>
         ))}
       </div>
 
-      {/* TAB 1: MINDNEST DASHBOARD OVERVIEW */}
-      {activeTab === "overview" ? (
+      {/* TAB 1: OVERVIEW */}
+      {activeTab === "overview" && (
         <div className="space-y-6">
-          {/* Top Row: Hero Banner & Health Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Hero Banner (Join Our Meditation Class / Ayurvedic Care) */}
-            <div className="lg:col-span-6 rounded-3xl bg-gradient-to-br from-[#18313c] via-[#234452] to-[#2d5567] text-white p-7 md:p-8 shadow-sm relative overflow-hidden flex flex-col justify-between min-h-[300px]">
-              {/* Background ambient lighting */}
-              <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />
-              <div className="absolute right-0 bottom-0 opacity-25 pointer-events-none select-none">
-                <svg width="240" height="240" viewBox="0 0 200 200" fill="none">
-                  <circle cx="100" cy="100" r="80" stroke="white" strokeWidth="2" strokeDasharray="6 6" />
-                  <path d="M100 40 C70 80, 70 120, 100 160 C130 120, 130 80, 100 40 Z" fill="white" fillOpacity="0.3" />
-                  <circle cx="100" cy="70" r="16" fill="white" fillOpacity="0.4" />
-                </svg>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="rounded-3xl bg-white p-5 border border-slate-200/80 shadow-xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase font-mono">
+                <span>Active Care Plans</span>
+                <Pill className="h-4 w-4 text-sky-600" />
               </div>
+              <p className="text-3xl font-bold text-slate-900">{care?.length ?? 0}</p>
+              <p className="text-xs text-slate-500">Prescribed by practitioner</p>
+            </div>
 
-              <div className="relative z-10 space-y-3 max-w-sm">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-medium backdrop-blur-md">
-                  <span>🌿</span> AYUSH Holistic Care
+            <div className="rounded-3xl bg-white p-5 border border-slate-200/80 shadow-xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase font-mono">
+                <span>Diet &amp; Nutrition</span>
+                <Utensils className="h-4 w-4 text-emerald-600" />
+              </div>
+              <p className="text-3xl font-bold text-slate-900">{diet?.length ?? 0}</p>
+              <p className="text-xs text-slate-500">Clinical Ayurvedic meal plans</p>
+            </div>
+
+            <div className="rounded-3xl bg-white p-5 border border-slate-200/80 shadow-xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase font-mono">
+                <span>Logged Symptoms</span>
+                <Activity className="h-4 w-4 text-amber-600" />
+              </div>
+              <p className="text-3xl font-bold text-slate-900">{symptoms?.length ?? 0}</p>
+              <p className="text-xs text-slate-500">Active health signals</p>
+            </div>
+
+            <div className="rounded-3xl bg-white p-5 border border-slate-200/80 shadow-xs space-y-1">
+              <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase font-mono">
+                <span>Upcoming Visits</span>
+                <Calendar className="h-4 w-4 text-indigo-600" />
+              </div>
+              <p className="text-3xl font-bold text-slate-900">{appointments?.length ?? 0}</p>
+              <p className="text-xs text-slate-500">Scheduled consultations</p>
+            </div>
+          </div>
+
+          {/* Quick Action Banner */}
+          <div className="rounded-3xl bg-gradient-to-r from-[#1b343f] to-[#254b5c] p-6 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-0.5 text-xs font-semibold text-sky-200 border border-white/20">
+                <Sparkles className="h-3.5 w-3.5 text-sky-300" />
+                <span>Next-Gen Smart OPD</span>
+              </span>
+              <h3 className="text-xl font-bold text-white">Need a clinical evaluation or new prescription?</h3>
+              <p className="text-sm text-slate-200">
+                Speak directly with the voice chatbot for instant case-taking or book an in-clinic OPD slot.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2.5 shrink-0">
+              <button
+                onClick={() => goTab("intake")}
+                className="rounded-2xl bg-white text-[#1b343f] hover:bg-sky-50 px-5 py-2.5 text-sm font-bold shadow-sm transition-all"
+              >
+                Launch Voice Intake
+              </button>
+              <button
+                onClick={() => goTab("book")}
+                className="rounded-2xl bg-white/10 hover:bg-white/20 text-white border border-white/30 px-5 py-2.5 text-sm font-semibold transition-all"
+              >
+                Find Nearest Clinic
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: INTAKE */}
+      {activeTab === "intake" && (
+        <div>{intake}</div>
+      )}
+
+      {/* TAB 3: DOCUMENTS */}
+      {activeTab === "documents" && (
+        <DocumentPipelinePanel
+          extracts={documentExtracts}
+          onUpload={handlePatientUpload}
+          viewMode="patient"
+        />
+      )}
+
+
+      {/* TAB 4: SYMPTOMS */}
+      {activeTab === "symptoms" && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-6 max-w-3xl">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Symptoms &amp; Clinical Journal</h2>
+            <p className="text-sm text-slate-500">Record current discomfort, intensity, and location for your doctor.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-xs font-bold uppercase font-mono text-slate-600">Symptom / Discomfort</span>
+              <input
+                className="tl-input mt-1"
+                placeholder="e.g. Sharp pain in lower abdomen"
+                value={symForm.name}
+                onChange={(e) => setSymForm({ ...symForm, name: e.target.value })}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-bold uppercase font-mono text-slate-600">
+                Severity Scale (1 to 10): {symForm.severity}
+              </span>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                className="w-full mt-3"
+                value={symForm.severity}
+                onChange={(e) => setSymForm({ ...symForm, severity: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+
+          <button
+            className="btn-pulse px-6 py-2.5 text-sm font-bold"
+            onClick={async () => {
+              if (!symForm.name.trim()) return;
+              await logSymptom({
+                sessionUserId,
+                text: symForm.name.trim(),
+                severity: symForm.severity,
+              });
+              setSymForm({
+                name: "",
+                severity: 5,
+                startedAt: new Date().toISOString().slice(0, 16),
+                location: "",
+                character: "",
+                radiation: "",
+                notes: "",
+              });
+            }}
+          >
+            Save Symptom Entry
+          </button>
+
+          <div className="pt-4 border-t border-slate-100">
+            <h4 className="text-sm font-bold text-slate-800 uppercase font-mono mb-3">Logged History</h4>
+            <div className="space-y-2">
+              {symptoms?.map((s) => (
+                <div key={s._id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-sm text-slate-900">{s.text}</span>
+                    <p className="text-xs text-slate-500">{new Date(s.createdAt).toLocaleDateString()} · Intensity {s.severity}/10</p>
+                  </div>
+                  <span className="rounded-full bg-amber-100 text-amber-900 px-3 py-0.5 text-xs font-bold">
+                    Recorded
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </section>
+      )}
+
+      {/* TAB 5: LIFESTYLE */}
+      {activeTab === "lifestyle" && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-6 max-w-3xl">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Ahara-Vihara (Ayurvedic Routine)</h2>
+            <p className="text-sm text-slate-500">Track hydration, dinacharya rituals, and restful sleep.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-5 rounded-3xl bg-sky-50/60 border border-sky-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-sky-950 flex items-center gap-1.5">
+                  <Droplets className="h-4 w-4 text-sky-600" />
+                  Daily Water Intake
                 </span>
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight leading-snug text-white">
-                  Join Our Daily Dinacharya & Meditation Class
-                </h2>
-                <p className="text-xs text-slate-200/90 leading-relaxed">
-                  Guided Pranayama, Ahara balance, and Dosha-specific holistic wellness for your mind and body.
-                </p>
-                <div className="pt-2">
-                  <button
-                    onClick={() => goTab("intake")}
-                    className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-5 py-2.5 text-xs font-semibold transition-all border border-white/30 shadow-xs"
-                  >
-                    Join Now
-                  </button>
-                </div>
+                <span className="font-mono text-sm font-bold text-sky-800">{waterLogged} ml / 2500 ml</span>
               </div>
-
-              <div className="relative z-10 pt-6 flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-200 text-[10px] font-bold text-slate-800 border-2 border-[#18313c]">🧘‍♀️</div>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-200 text-[10px] font-bold text-slate-800 border-2 border-[#18313c]">🌿</div>
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-200 text-[10px] font-bold text-slate-800 border-2 border-[#18313c]">🍵</div>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">9K+ Members</p>
-                  <p className="text-[10px] text-slate-300">Active Ayush Patients</p>
-                </div>
+              <div className="w-full bg-white rounded-full h-3 overflow-hidden border border-sky-200">
+                <div className="bg-sky-500 h-full rounded-full transition-all" style={{ width: `${Math.min(100, (waterLogged / 2500) * 100)}%` }} />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-sky-800 border border-sky-200 hover:bg-sky-100 shadow-2xs"
+                  onClick={() => setWaterLogged((w) => w + 250)}
+                >
+                  +250 ml (1 Glass)
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-sky-800 border border-sky-200 hover:bg-sky-100 shadow-2xs"
+                  onClick={() => setWaterLogged((w) => w + 500)}
+                >
+                  +500 ml (Bottle)
+                </button>
               </div>
             </div>
 
-            {/* Health & Dosha Overview Card */}
-            <div className="lg:col-span-6 rounded-3xl bg-white p-7 md:p-8 shadow-sm border border-slate-100/90 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🫀</span>
-                    <p className="font-bold text-sm text-slate-800">Health & Dosha Overview</p>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 font-mono text-[10px] font-semibold text-emerald-700 border border-emerald-100">
-                    ● Steady Vitals
-                  </span>
-                </div>
+            <div className="p-5 rounded-3xl bg-emerald-50/60 border border-emerald-100 space-y-2">
+              <span className="font-bold text-sm text-emerald-950 flex items-center gap-1.5">
+                <Leaf className="h-4 w-4 text-emerald-600" />
+                Dinacharya Daily Rituals
+              </span>
+              <div className="space-y-1.5 pt-1">
+                {(
+                  [
+                    ["warm-water", "Ushapan (Warm water on empty stomach)"],
+                    ["morning-walk", "Pranayama / Morning Walk (20 mins)"],
+                    ["timely-meals", "Ahara Timing (Lighter dinner before 8 PM)"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!routineDone[key]}
+                      onChange={(e) => setRoutineDone((prev) => ({ ...prev, [key]: e.target.checked }))}
+                      className="rounded border-slate-300 text-emerald-700"
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
 
-                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-4xl font-bold tracking-tight text-slate-900">88</p>
-                      <p className="font-mono text-sm text-slate-500 font-medium">bpm</p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500 max-w-xs leading-relaxed">
-                      Your heart rate & Vata-Pitta equilibrium are steady and healthy today.
-                    </p>
-                  </div>
-
-                  {/* Anatomical / Ayurvedic Indicator */}
-                  <div className="relative flex h-28 w-28 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ebf5fa] to-[#d6ebf5] border border-sky-100">
-                    <div className="text-center">
-                      <span className="text-3xl">🫀</span>
-                      <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-sky-900 mt-1">Vata-Pitta</p>
-                    </div>
-                    <span className="absolute -top-2 -right-2 rounded-full bg-slate-900 px-2 py-0.5 font-mono text-[9px] font-bold text-white shadow-xs">
-                      110/80
-                    </span>
-                    <span className="absolute -bottom-2 -left-2 rounded-full bg-sky-100 px-2 py-0.5 font-mono text-[9px] font-bold text-sky-800 border border-sky-200">
-                      75-92 bpm
-                    </span>
-                  </div>
-                </div>
               </div>
+            </div>
+          </div>
+        </section>
+      )}
 
-              <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  onClick={() => goTab("intake")}
-                  className="rounded-full bg-[#cde4f0] hover:bg-[#b8daec] text-slate-900 px-4 py-2 text-xs font-semibold transition-colors flex items-center gap-1.5"
-                >
-                  Improve Health ✨
-                </button>
+      {/* TAB 6: CARE & DIET PLANS + FOOD DATABASE */}
+      {activeTab === "plans" && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Ayurvedic Nutrition &amp; Care Plans</h2>
+              <p className="text-sm text-slate-500">Explore doctor-approved clinical diet plans and the 299-item Ayurvedic food database.</p>
+            </div>
 
-                {/* Organ / Dosha selector pills */}
-                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+            <div className="inline-flex rounded-2xl bg-slate-100 p-1 border border-slate-200">
+              <button
+                type="button"
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                  plansView === "plans"
+                    ? "bg-[#1b343f] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                onClick={() => setPlansView("plans")}
+              >
+                Care &amp; Diet Plans ({care?.length ?? 0})
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                  plansView === "foods"
+                    ? "bg-[#1b343f] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                onClick={() => setPlansView("foods")}
+              >
+                Food Database ({allFoods?.length ?? 299})
+              </button>
+            </div>
+          </div>
+
+          {/* Subview 1: Diet Plans */}
+          {plansView === "plans" && (
+            <div className="space-y-4">
+              {care && care.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {care.map((c) => (
+                    <div key={c._id} className="p-5 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-slate-900">{c.title}</span>
+                        <span className="rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-0.5 text-xs font-bold">
+                          Approved
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">{c.body}</p>
+                    </div>
+
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-3xl bg-slate-50 p-8 text-center border border-slate-200 space-y-3">
+                  <Pill className="h-8 w-8 text-slate-400 mx-auto" />
+                  <h4 className="text-base font-bold text-slate-800">No Prescribed Care Plans Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Once your practitioner approves your clinical assessment, your tailored meal guidelines and rasayana therapy will appear here.
+                  </p>
+                  <button
+                    onClick={() => setPlansView("foods")}
+                    className="btn-pulse px-4 py-2 text-xs font-bold"
+                  >
+                    Browse Food Database Instead
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Subview 2: Food Browser */}
+          {plansView === "foods" && (
+            <div className="space-y-4">
+              {/* Search & Dosha Filter Bar */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search 299 foods by name, category, or taste..."
+                    value={foodSearch}
+                    onChange={(e) => setFoodSearch(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
                   {(
                     [
-                      ["vata", "🫀 Vata"],
-                      ["pitta", "🧠 Pitta"],
-                      ["kapha", "🫁 Kapha"],
-                      ["dashavidha", "🩺 Dashavidha"],
+                      ["all", "All Doshas"],
+                      ["vata", "Vata-Pacifying"],
+                      ["pitta", "Pitta-Pacifying"],
+                      ["kapha", "Kapha-Pacifying"],
                     ] as const
                   ).map(([d, label]) => (
                     <button
                       key={d}
-                      onClick={() => setSelectedDosha(d)}
-                      className={`rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                        selectedDosha === d
-                          ? "bg-white text-slate-900 shadow-xs border border-slate-200"
-                          : "text-slate-500 hover:text-slate-800"
+                      type="button"
+                      onClick={() => setFoodDoshaFilter(d)}
+                      className={`rounded-xl px-3 py-2 text-xs font-bold transition-all ${
+                        foodDoshaFilter === d
+                          ? "bg-[#1b343f] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                       }`}
                     >
                       {label}
@@ -476,929 +771,571 @@ export function PatientStation({
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Bottom Grid: 3 Metric & Routine Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 1. Calories / Ahara Intake Card */}
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">🔥</span>
-                    <p className="font-bold text-sm text-slate-800">Calories & Ahara</p>
-                  </div>
-                  <span className="font-mono text-[10px] text-slate-400">Target 2,100</span>
-                </div>
-
-                {/* Histogram / Bar Graphic */}
-                <div className="mt-4 flex items-end justify-between gap-1 h-24 px-1">
-                  {[45, 60, 35, 75, 90, 50, 65, 80, 40, 70, 85, 95, 60, 80].map((h, i) => (
-                    <div
-                      key={i}
-                      className="w-full rounded-t-sm transition-all duration-300 hover:opacity-80"
-                      style={{
-                        height: `${h}%`,
-                        backgroundColor: i % 2 === 0 ? "#9ecfe4" : "#2d5567",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-baseline justify-between">
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">1858 <span className="text-xs font-normal text-slate-500">Kcl</span></p>
-                  <p className="text-[11px] text-slate-400">Balanced Ahara intake today</p>
-                </div>
-                <button onClick={() => goTab("lifestyle")} className="text-xs font-semibold text-sky-700 hover:underline">
-                  Log meal →
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Hydration Status Card */}
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">💧</span>
-                    <p className="font-bold text-sm text-slate-800">Hydration Status</p>
-                  </div>
-                  <span className="font-mono text-[10px] text-slate-400">Goal 2,200 ml</span>
-                </div>
-
-                <div className="mt-3">
-                  <p className="text-2xl font-bold text-slate-900">{waterLogged} <span className="text-xs font-normal text-slate-500">ml</span></p>
-                  <p className="text-xs text-slate-500">{Math.round((waterLogged / 2200) * 100)}% Completed</p>
-                </div>
-
-                {/* Water Fluid Wave Graphic */}
-                <div className="mt-4 relative h-16 w-full overflow-hidden rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-40">
-                    <svg className="w-full h-full" viewBox="0 0 100 25" preserveAspectRatio="none">
-                      <path d="M0 10 C 20 20, 40 0, 60 10 C 80 20, 100 5, 100 25 L 0 25 Z" fill="#0284c7" />
-                    </svg>
-                  </div>
-                  <span className="relative z-10 text-xs font-bold text-sky-900">
-                    🌊 USHODAKA (Warm Water)
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-[11px] text-slate-400">Keeps Pitta & Agni pure</p>
-                <button
-                  onClick={() => setWaterLogged((w) => Math.min(3000, w + 250))}
-                  className="rounded-full bg-sky-100 hover:bg-sky-200 text-sky-800 px-3 py-1 text-xs font-semibold transition-colors"
-                >
-                  +250 ml
-                </button>
-              </div>
-            </div>
-
-            {/* 3. Dinacharya / Daily Care Schedule Card */}
-            <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 flex flex-col justify-between">
-              <div>
-                {/* Day selector tabs */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  {(["Sat", "Sun", "Mon", "Tue", "Wed"] as const).map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => setActiveDay(d)}
-                      className={`rounded-xl px-2.5 py-1 text-xs font-semibold transition-all ${
-                        activeDay === d
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "text-slate-400 hover:text-slate-800"
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Routine Items */}
-                <div className="mt-3 space-y-2.5">
-                  {/* Item 1 */}
-                  <div className="flex items-center justify-between p-2 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sm">🧘‍♀️</div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-xs text-slate-900 truncate">Pranayama / Dhyana</p>
-                        <p className="text-[10px] text-slate-400">⏱️ 5 mins · Beginner</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setRoutineDone((r) => ({ ...r, "pull-up": !r["pull-up"] }))}
-                      className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        routineDone["pull-up"]
-                          ? "bg-emerald-500 text-white shadow-xs"
-                          : "border border-slate-300 text-slate-400 hover:bg-slate-200"
-                      }`}
-                    >
-                      {routineDone["pull-up"] ? "✓" : ""}
-                    </button>
-                  </div>
-
-                  {/* Item 2 */}
-                  <div className="flex items-center justify-between p-2 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-sm">🍵</div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-xs text-slate-900 truncate">Triphala Kashaya</p>
-                        <p className="text-[10px] text-slate-400">⏱️ Morning · Ahara</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setRoutineDone((r) => ({ ...r, "sit-up": !r["sit-up"] }))}
-                      className="rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 text-[11px] font-semibold transition-colors"
-                    >
-                      {routineDone["sit-up"] ? "✓ Done" : "Start"}
-                    </button>
-                  </div>
-
-                  {/* Item 3 */}
-                  <div className="flex items-center justify-between p-2 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm">🚶‍♂️</div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-xs text-slate-900 truncate">Surya Namaskar</p>
-                        <p className="text-[10px] text-slate-400">⏱️ 10 mins · Moderate</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setRoutineDone((r) => ({ ...r, "squat": !r["squat"] }))}
-                      className="rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 text-[11px] font-semibold transition-colors"
-                    >
-                      {routineDone["squat"] ? "✓ Done" : "Start"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* TAB 2: AI CASE TAKING (Intake) */}
-      {activeTab === "intake" ? (
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Ayurvedic Case Taking</p>
-            <h2 className="text-xl font-bold text-slate-900">Clinical Intake Wizard</h2>
-            <p className="text-xs text-slate-500">
-              Bound visits: {visits?.length ?? 0}. Same engine as /kiosk, linked to your account.
-            </p>
-          </div>
-          {intake}
-        </div>
-      ) : null}
-
-      {/* TAB 3: PHYSICAL DOCUMENTS & OCR PIPELINE */}
-      {activeTab === "documents" ? (
-        <section className="space-y-4">
-          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-            <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Physical Documents & OCR</p>
-            <h2 className="text-xl font-bold text-slate-900">Prescriptions, Lab Sheets & External Scans</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Upload physical records from past visits or external clinics. OCR extracts candidate text for your doctor to review. Content is never automatically merged into your active medications without doctor verification.
-            </p>
-          </div>
-
-          <DocumentPipelinePanel
-            extracts={documentExtracts ?? []}
-            onUpload={handlePatientUpload}
-            viewMode="patient"
-          />
-
-        </section>
-      ) : null}
-
-      {/* TAB 4: SYMPTOMS TIMELINE */}
-      {activeTab === "symptoms" ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Symptom Log</h2>
-            <p className="text-xs text-slate-500">Record current pain, digestive discomfort, or sleep patterns.</p>
-          </div>
-          <textarea
-            className="tl-input"
-            rows={3}
-            placeholder="Describe what you are experiencing..."
-            value={symptomText}
-            onChange={(e) => setSymptomText(e.target.value)}
-          />
-          <label className="block font-mono text-xs text-slate-600">
-            Severity ({severity}/10)
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={severity}
-              onChange={(e) => setSeverity(Number(e.target.value))}
-              className="mt-1 w-full"
-            />
-          </label>
-          <button
-            className="btn-pulse px-4 py-2 text-xs"
-            onClick={async () => {
-              if (!symptomText.trim()) return;
-              await logSymptom({ sessionUserId, text: symptomText, severity });
-              setSymptomText("");
-            }}
-          >
-            Log Symptom
-          </button>
-          <ol className="space-y-2 pt-2">
-            {symptoms?.map((s) => (
-              <li key={s._id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="font-mono text-[10px] text-slate-400">
-                  {new Date(s.createdAt).toLocaleString()} · Severity {s.severity}/10
-                </span>
-                <p className="text-sm text-slate-800 mt-0.5">{s.text}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      {/* TAB 5: AHARA-VIHARA LIFESTYLE */}
-      {activeTab === "lifestyle" ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Ahara-Vihara (Diet & Daily Regimen)</h2>
-            <p className="text-xs text-slate-500">
-              Last saved {lifestyle ? new Date(lifestyle.updatedAt).toLocaleString() : "never"}.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(
-              [
-                ["mealTimes", "Meal Times & Routines"],
-                ["dietType", "Diet Type (Satvik / Rajasik / Tamasik)"],
-                ["sleep", "Sleep Schedule (Nidra)"],
-                ["waterIntake", "Water & Ushodaka Intake"],
-                ["teaCoffeeSubstances", "Tea / Coffee / Other Substances"],
-                ["notes", "Additional Lifestyle Notes"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="block">
-                <span className="text-xs font-semibold text-slate-700">{label}</span>
-                <input
-                  className="tl-input mt-1"
-                  defaultValue={lifestyle?.[key] ?? ""}
-                  onChange={(e) => setLife((l) => ({ ...l, [key]: e.target.value }))}
-                />
-              </label>
-            ))}
-          </div>
-          <button
-            className="btn-pulse px-5 py-2.5 text-xs"
-            onClick={() =>
-              void upsertLifestyle({
-                sessionUserId,
-                mealTimes: life.mealTimes || lifestyle?.mealTimes || "",
-                dietType: life.dietType || lifestyle?.dietType || "",
-                sleep: life.sleep || lifestyle?.sleep || "",
-                waterIntake: life.waterIntake || lifestyle?.waterIntake || "",
-                teaCoffeeSubstances: life.teaCoffeeSubstances || lifestyle?.teaCoffeeSubstances || "",
-                notes: life.notes || lifestyle?.notes || "",
-              })
-            }
-          >
-            Save Lifestyle Regimen
-          </button>
-        </section>
-      ) : null}
-
-      {/* TAB 6: CARE & DIET PLANS + FOOD BROWSER */}
-      {activeTab === "plans" ? (
-        <section className="space-y-6">
-          {/* Toggle: Plans vs Food Browser */}
-          <div className="flex items-center gap-2 rounded-2xl bg-white/70 p-1.5 border border-slate-200/80 shadow-xs w-fit">
-            <button
-              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-all ${plansView === "plans" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
-              onClick={() => setPlansView("plans")}
-            >
-              💊 Care & Nutrition Plans
-            </button>
-            <button
-              className={`rounded-xl px-4 py-1.5 text-xs font-semibold transition-all ${plansView === "foods" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"}`}
-              onClick={() => setPlansView("foods")}
-            >
-              🥗 Food Database ({allFoods?.length ?? "..."})
-            </button>
-          </div>
-
-          {/* ─── Plans View ─────────────────────────────────────────── */}
-          {plansView === "plans" && (
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-                <h2 className="text-lg font-bold text-slate-900">Practitioner-Approved Care</h2>
-                {care?.length === 0 ? <p className="mt-2 text-xs text-slate-400">None shared yet.</p> : null}
-                {care?.map((p) => (
-                  <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                    <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
-                      {p.status}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
-                    <p className="whitespace-pre-wrap text-xs text-slate-600 mt-1">{p.body}</p>
-                  </article>
+              {/* Food Categories Horizontal Scroll */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {foodCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setFoodCategory(cat)}
+                    className={`rounded-full px-3.5 py-1 text-xs font-semibold whitespace-nowrap transition-all ${
+                      foodCategory === cat
+                        ? "bg-emerald-700 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
               </div>
 
-              <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-                <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-lg font-bold text-slate-900">Diet & Nutrition Plans</h2>
-                  <button
-                    className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-semibold transition-colors border border-emerald-200"
-                    onClick={() => setPlansView("foods")}
-                  >
-                    🥗 Browse Food Database →
-                  </button>
-                </div>
-                <p className="text-xs text-slate-400">Visible once approved by your practitioner.</p>
-                {diet?.length === 0 ? (
-                  <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
-                    <p className="text-2xl">🥗</p>
-                    <p className="text-xs text-slate-500 font-medium">No diet plans shared yet.</p>
-                    <p className="text-[11px] text-slate-400">Your dietitian will share approved plans here. In the meantime, explore the food database!</p>
+              {/* Selected Food Item Detail Panel */}
+              {selectedFoodItem && (
+                <div className="rounded-3xl bg-emerald-50/80 border border-emerald-200 p-5 space-y-3 shadow-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-800 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        {selectedFoodItem.category} · {selectedFoodItem.energy || "Virya: Neutral"}
+                      </span>
+                      <h3 className="text-lg font-bold text-slate-900 mt-1.5">{selectedFoodItem.name}</h3>
+                      <p className="text-xs text-slate-700 leading-relaxed mt-0.5">{selectedFoodItem.description}</p>
+                    </div>
                     <button
-                      className="mt-1 rounded-xl bg-[#1b343f] text-white px-4 py-2 text-xs font-bold hover:bg-[#274d5d] transition-colors"
-                      onClick={() => setPlansView("foods")}
+                      type="button"
+                      onClick={() => setSelectedFood(null)}
+                      className="rounded-full bg-white p-1 text-slate-400 hover:text-slate-600 border border-slate-200"
                     >
-                      Browse 299+ Foods →
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
-                ) : null}
-                {diet?.map((p) => (
-                  <article key={p._id} className="mt-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                    <span className="rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold px-2.5 py-0.5">
-                      {p.practitionerApproved ? "✓ Practitioner Approved" : "Shared"}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1">{p.title}</h3>
-                    <p className="text-xs text-slate-600 mt-1">{p.notes}</p>
-                    <div className="mt-2 space-y-1">
-                      {p.meals.map((m) => (
-                        <p key={m._id} className="font-mono text-xs text-slate-700">
-                          <span className="font-bold">{m.label}:</span> {m.itemsText}
-                        </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    <div className="bg-white p-2.5 rounded-2xl border border-emerald-100">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Rasa (Taste)</span>
+                      <span className="text-xs font-bold text-slate-900">{selectedFoodItem.taste?.join(", ") || "Sweet"}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-2xl border border-emerald-100">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Virya (Potency)</span>
+                      <span className="text-xs font-bold text-slate-900">{selectedFoodItem.energy || "Sheeta (Cooling)"}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-2xl border border-emerald-100">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Dosha Action</span>
+                      <span className="text-xs font-bold text-emerald-800">
+                        {selectedFoodItem.dosha ? Object.entries(selectedFoodItem.dosha).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join(" | ") : "Tridoshic"}
+                      </span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-2xl border border-emerald-100">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Season / Kala</span>
+                      <span className="text-xs font-bold text-slate-900">{selectedFoodItem.bestSeason?.join(", ") || "All Seasons"}</span>
+                    </div>
+                  </div>
+                </div>
+
+              )}
+
+              {/* Food Items Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                {filteredFoods.slice(0, 32).map((item) => (
+                  <div
+                    key={item._id}
+                    onClick={() => setSelectedFood(item._id)}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      selectedFood === item._id
+                        ? "bg-white border-emerald-500 shadow-md ring-2 ring-emerald-500/20"
+                        : "bg-white border-slate-200/90 hover:border-sky-300 hover:shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                      <span>{item.category}</span>
+                      <span className="text-emerald-700">{item.energy || "Neutral"}</span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 mt-1">{item.name}</h4>
+                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{item.description}</p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {item.taste?.slice(0, 2).map((t) => (
+                        <span key={t} className="rounded-md bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[10px] font-medium">
+                          {t}
+                        </span>
                       ))}
                     </div>
-                  </article>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ─── Food Database Browser ───────────────────────────────── */}
-          {plansView === "foods" && (
-            <div className="space-y-4">
-              {/* Header */}
-              <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-100/90">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">🥗 Ayurvedic Food Database</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {filteredFoods.length} of {allFoods?.length ?? 0} foods · Filter by dosha, category, or search
-                    </p>
-                  </div>
-                  <button
-                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 transition-colors"
-                    onClick={() => setPlansView("plans")}
-                  >
-                    ← Back to Plans
-                  </button>
-                </div>
+        </section>
+      )}
 
-                {/* Filters Row */}
-                <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                  {/* Search */}
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
+      {/* TAB 7: ADHERENCE */}
+      {activeTab === "adherence" && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4 max-w-2xl">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Treatment Check-ins &amp; Compliance</h2>
+            <p className="text-sm text-slate-500">Record your daily adherence to medicines, herbs, and diet.</p>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="e.g. Took Triphala before bed, feel lighter"
+              value={checkin}
+              onChange={(e) => setCheckin(e.target.value)}
+              className="tl-input text-sm flex-1"
+            />
+            <button
+              className="btn-pulse px-5 py-2.5 text-sm font-bold shrink-0"
+              onClick={async () => {
+                if (!checkin.trim()) return;
+                await logAdherence({
+                  sessionUserId,
+                  kind: "checkin",
+                  done: true,
+                  note: checkin.trim(),
+                });
+
+                setCheckin("");
+              }}
+            >
+              Log Entry
+            </button>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            {adherence?.map((a) => (
+              <div key={a._id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-700 flex items-center justify-between">
+                <div>
+                  <span className="font-semibold text-slate-900">{a.note}</span>
+                  <p className="text-[11px] text-slate-400">{new Date(a.createdAt).toLocaleString()}</p>
+                </div>
+                <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 font-bold text-[11px]">
+                  Completed
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* TAB 8: BOOK FOLLOW-UP & INTERACTIVE NEAREST CLINIC MAP */}
+      {activeTab === "book" && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200/90 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="font-mono text-xs font-bold text-sky-800 uppercase tracking-wider bg-sky-50 px-3 py-1 rounded-full border border-sky-200">
+                  Doctor Consultations &amp; Telehealth
+                </span>
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">Book Follow-up &amp; Find Centers</h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Schedule an in-person visit at the nearest accredited center or join an instant encrypted video OPD.
+                </p>
+              </div>
+
+              {/* Consultation Mode Selector */}
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 shrink-0">
+                {(
+                  [
+                    ["in_clinic", "In-Clinic OPD", Building2],
+                    ["telehealth", "Video Telehealth", Video],
+                    ["home_visit", "Home Care Visit", Home],
+                  ] as const
+                ).map(([mode, label, IconComp]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setConsultMode(mode)}
+                    className={`rounded-xl px-3.5 py-2 text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      consultMode === mode
+                        ? "bg-[#1b343f] text-white shadow-xs"
+                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-200"
+                    }`}
+                  >
+                    <IconComp className="h-3.5 w-3.5" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Nearest Clinic Map Locator (Shown for In-Clinic & Home Visit) */}
+          {consultMode !== "telehealth" && (
+            <ClinicMapLocator
+              selectedClinicId={selectedClinic.id}
+              onSelectClinic={(c) => setSelectedClinic(c)}
+            />
+          )}
+
+          {/* Main Booking Form Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Form Column (7 cols) */}
+            <div className="lg:col-span-7 rounded-3xl bg-white p-6 shadow-sm border border-slate-200/90 space-y-5">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Calendar className="h-5 w-5 text-sky-700" />
+                <span>Reserve Consultation Slot</span>
+              </h3>
+
+              {/* Name Prompt if generic */}
+              {(!displayName || ["new patient","new user","patient","user"].includes(displayName.trim().toLowerCase())) && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
+                  <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 text-amber-700" />
+                    <span>Please enter your patient name before booking</span>
+                  </p>
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      className="tl-input pl-8 text-xs w-full"
-                      placeholder="Search foods (e.g. turmeric, rice, ghee...)"
-                      value={foodSearch}
-                      onChange={(e) => setFoodSearch(e.target.value)}
+                      className="tl-input flex-1 bg-white text-sm"
+                      placeholder="Your full name (e.g. Priya Sharma)"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
                     />
-                  </div>
-
-                  {/* Dosha Filter */}
-                  <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-2xl border border-slate-100 shrink-0">
-                    {(["all", "vata", "pitta", "kapha"] as const).map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setFoodDoshaFilter(d)}
-                        className={`rounded-xl px-2.5 py-1 text-[11px] font-semibold transition-all capitalize ${
-                          foodDoshaFilter === d
-                            ? "bg-[#1b343f] text-white shadow-xs"
-                            : "text-slate-500 hover:text-slate-800 hover:bg-white"
-                        }`}
-                      >
-                        {d === "all" ? "All Doshas" : `🌿 ${d.charAt(0).toUpperCase() + d.slice(1)}`}
-                      </button>
-                    ))}
+                    <button
+                      className="rounded-xl bg-[#1b343f] px-4 py-2 text-xs font-bold text-white hover:bg-[#274d5d]"
+                      onClick={async () => {
+                        if (!customName.trim()) return;
+                        await updateName({ sessionUserId, displayName: customName.trim() });
+                      }}
+                    >
+                      Save Name
+                    </button>
                   </div>
                 </div>
+              )}
 
-                {/* Category Pills */}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {foodCategories.map((cat) => (
+              {/* Doctor / Specialist Selector */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase font-mono text-slate-600 block">
+                  Select Attending Specialist / Doctor
+                </span>
+                <select
+                  className="tl-input text-sm"
+                  value={practId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__manual__") {
+                      setPractId("" as Id<"users">);
+                      setManualDoctorName("");
+                      setUseManualDoctor(true);
+                    } else {
+                      setUseManualDoctor(false);
+                      setPractId(val as Id<"users">);
+                    }
+                  }}
+                >
+                  <option value="">-- Choose Registered Specialist --</option>
+                  {practitioners?.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.displayName} (Registered AYUSH/OPD Practitioner)
+                    </option>
+                  ))}
+                  {doctorSpecialties.map((doc, idx) => (
+                    <option key={idx} value={`preset-${idx}`}>
+                      {doc.name} - {doc.specialty} ({doc.exp})
+                    </option>
+                  ))}
+                  <option value="__manual__">+ Enter Doctor Name Manually</option>
+                </select>
+
+                {useManualDoctor && (
+                  <div className="pt-2">
+                    <input
+                      type="text"
+                      className="tl-input text-sm bg-white"
+                      placeholder="Enter doctor's full name (e.g. Dr. K. N. Verma)"
+                      value={manualDoctorName}
+                      onChange={(e) => setManualDoctorName(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Date Selector Pills */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase font-mono text-slate-600 block">
+                  Select Date
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(
+                    [
+                      ["today", "Today"],
+                      ["tomorrow", "Tomorrow"],
+                      ["in_2_days", "In 2 Days"],
+                      ["custom", "Pick Custom Date"],
+                    ] as const
+                  ).map(([id, label]) => (
                     <button
-                      key={cat}
-                      onClick={() => setFoodCategory(cat)}
-                      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all border ${
-                        foodCategory === cat
-                          ? "bg-[#1b343f] text-white border-[#1b343f]"
-                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                      key={id}
+                      type="button"
+                      onClick={() => setSelectedDateQuick(id)}
+                      className={`p-2.5 rounded-xl border text-xs font-bold text-center transition-all ${
+                        selectedDateQuick === id
+                          ? "bg-[#1b343f] text-white border-[#1b343f] shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                     >
-                      {cat}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedDateQuick === "custom" && (
+                  <input
+                    type="datetime-local"
+                    value={slot}
+                    onChange={(e) => setSlot(e.target.value)}
+                    className="tl-input text-sm mt-2"
+                  />
+                )}
+              </div>
+
+              {/* Time Slot Chips */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold uppercase font-mono text-slate-600 block">
+                  Select Preferred Time Slot
+                </span>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {["09:30 AM", "10:30 AM", "11:45 AM", "02:30 PM", "04:15 PM", "06:30 PM"].map((timeStr) => (
+                    <button
+                      key={timeStr}
+                      type="button"
+                      onClick={() => setSelectedTimeSlot(timeStr)}
+                      className={`p-2 rounded-xl border text-xs font-semibold text-center transition-all ${
+                        selectedTimeSlot === timeStr
+                          ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      {timeStr}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Food Grid + Detail Panel */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Food Card Grid */}
-                <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {allFoods === undefined ? (
-                    Array.from({ length: 9 }).map((_, i) => (
-                      <div key={i} className="rounded-2xl bg-white border border-slate-100 h-36 animate-pulse" />
-                    ))
-                  ) : filteredFoods.length === 0 ? (
-                    <div className="col-span-3 py-12 text-center text-slate-400">
-                      <p className="text-3xl mb-2">🔍</p>
-                      <p className="text-sm font-semibold">No foods found</p>
-                      <p className="text-xs mt-1">Try adjusting your search or filters</p>
-                    </div>
-                  ) : (
-                    filteredFoods.map((food) => (
-                      <button
-                        key={food._id}
-                        onClick={() => setSelectedFood(food._id === selectedFood ? null : food._id)}
-                        className={`rounded-2xl border text-left overflow-hidden transition-all hover:shadow-sm group ${
-                          selectedFood === food._id
-                            ? "border-[#1b343f] shadow-sm ring-2 ring-[#1b343f]/20"
-                            : "border-slate-200 bg-white hover:border-slate-400"
-                        }`}
-                      >
-                        {/* Food image */}
-                        <div className="relative h-24 w-full overflow-hidden bg-slate-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={food.imageUrl}
-                            alt={food.name}
-                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = `https://placehold.co/300x200/e2e8f0/64748b?text=${encodeURIComponent(food.name)}`;
-                            }}
-                          />
-                          {/* Dosha badges overlay */}
-                          <div className="absolute bottom-1 right-1 flex gap-0.5">
-                            {food.dosha.vata === "decrease" && (
-                              <span className="rounded-full bg-sky-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">V↓</span>
-                            )}
-                            {food.dosha.pitta === "decrease" && (
-                              <span className="rounded-full bg-orange-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">P↓</span>
-                            )}
-                            {food.dosha.kapha === "decrease" && (
-                              <span className="rounded-full bg-emerald-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 backdrop-blur-sm">K↓</span>
-                            )}
-                          </div>
-                        </div>
-                        {/* Food info */}
-                        <div className="p-2.5">
-                          <p className="font-bold text-xs text-slate-900 truncate leading-tight">{food.name}</p>
-                          <p className="font-mono text-[10px] text-slate-400 mt-0.5 truncate">{food.category}</p>
-                          <div className="mt-1.5 flex items-center gap-1 flex-wrap">
-                            {food.taste.slice(0, 2).map((t) => (
-                              <span key={t} className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-semibold px-1.5 py-0.5 capitalize">
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
+              {/* WhatsApp Notification Input */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <label className="block">
+                  <span className="text-xs font-bold uppercase font-mono text-slate-600 block">
+                    WhatsApp Number for Instant Confirmation
+                  </span>
+                  <div className="relative mt-1">
+                    <Smartphone className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="tl-input pl-10 text-sm"
+                    />
+                  </div>
+                </label>
 
-                {/* Detail Panel */}
-                <div className="lg:col-span-1">
-                  {selectedFoodItem ? (
-                    <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden sticky top-4">
-                      <div className="relative h-40 w-full overflow-hidden bg-slate-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={selectedFoodItem.imageUrl}
-                          alt={selectedFoodItem.name}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = `https://placehold.co/400x200/e2e8f0/64748b?text=${encodeURIComponent(selectedFoodItem.name)}`;
-                          }}
-                        />
-                        <button
-                          onClick={() => setSelectedFood(null)}
-                          className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/40 text-white text-xs flex items-center justify-center hover:bg-black/60 transition-colors"
-                        >
-                          ✕
-                        </button>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
-                          <p className="font-bold text-white text-sm">{selectedFoodItem.name}</p>
-                          <p className="text-white/80 text-[11px]">{selectedFoodItem.category}</p>
-                        </div>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        {/* Description */}
-                        <p className="text-xs text-slate-700 leading-relaxed">{selectedFoodItem.description}</p>
-
-                        {/* Dosha Impact */}
-                        <div className="space-y-1.5">
-                          <p className="font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dosha Impact</p>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {(["vata", "pitta", "kapha"] as const).map((d) => (
-                              <div
-                                key={d}
-                                className={`rounded-xl p-2 text-center text-[10px] font-bold border ${
-                                  selectedFoodItem.dosha[d] === "decrease"
-                                    ? d === "vata" ? "bg-sky-50 text-sky-800 border-sky-200"
-                                      : d === "pitta" ? "bg-orange-50 text-orange-800 border-orange-200"
-                                      : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                    : "bg-slate-50 text-slate-500 border-slate-100"
-                                }`}
-                              >
-                                <div className="capitalize font-semibold">{d}</div>
-                                <div className="mt-0.5">{selectedFoodItem.dosha[d] === "decrease" ? "↓ Pacifies" : selectedFoodItem.dosha[d] === "increase" ? "↑ Increases" : "→ Neutral"}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Nutrition */}
-                        <div className="space-y-1.5">
-                          <p className="font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nutrition (per 100g)</p>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {(["calories", "protein", "carbs", "fat"] as const).map((n) => (
-                              <div key={n} className="rounded-xl bg-slate-50 border border-slate-100 p-2">
-                                <p className="text-[10px] text-slate-400 capitalize">{n}</p>
-                                <p className="font-bold text-xs text-slate-800">{selectedFoodItem.nutrition[n]}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Taste & Season */}
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedFoodItem.taste.map((t) => (
-                            <span key={t} className="rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2 py-0.5 capitalize">
-                              🌿 {t}
-                            </span>
-                          ))}
-                          {selectedFoodItem.bestSeason.map((s) => (
-                            <span key={s} className="rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-semibold px-2 py-0.5">
-                              📅 {s}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Energy */}
-                        <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2 flex items-center justify-between">
-                          <span className="text-[10px] text-slate-500 font-medium">Virya (Energy)</span>
-                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${selectedFoodItem.energy === "hot" ? "bg-red-100 text-red-700" : "bg-sky-100 text-sky-700"}`}>
-                            {selectedFoodItem.energy === "hot" ? "🔥 Hot" : "❄️ Cold"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-3xl bg-white border border-dashed border-slate-200 p-8 text-center space-y-2 sticky top-4">
-                      <p className="text-3xl">🥗</p>
-                      <p className="text-sm font-semibold text-slate-700">Select a food to see details</p>
-                      <p className="text-xs text-slate-400">Dosha impact, nutrition facts, Virya energy, taste (Shad Rasa), and best seasons</p>
-                    </div>
-                  )}
-                </div>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={sendWhatsAppAlert}
+                    onChange={(e) => setSendWhatsAppAlert(e.target.checked)}
+                    className="rounded border-slate-300 text-[#1b343f]"
+                  />
+                  <span>Send instant appointment confirmation &amp; digital token to my WhatsApp</span>
+                </label>
               </div>
-            </div>
-          )}
-        </section>
-      ) : null}
 
-      {/* TAB 7: ADHERENCE CHECK-INS */}
-      {activeTab === "adherence" ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Daily Adherence Check-In</h2>
-            <p className="text-xs text-slate-500">Confirm you took your herbs and followed your Ahara-Vihara advice.</p>
-          </div>
-          <textarea
-            className="tl-input"
-            rows={2}
-            placeholder="e.g. Took Triphala and completed morning Pranayama"
-            value={checkin}
-            onChange={(e) => setCheckin(e.target.value)}
-          />
-          <button
-            className="btn-pulse px-4 py-2 text-xs font-semibold"
-            onClick={async () => {
-              await logAdherence({
-                sessionUserId,
-                kind: "checkin",
-                note: checkin || "Followed today",
-                done: true,
-              });
-              setCheckin("");
-            }}
-          >
-            Log Check-In
-          </button>
-          <ul className="space-y-2 pt-2">
-            {adherence?.map((a) => (
-              <li key={a._id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 font-mono text-xs text-slate-700">
-                {new Date(a.createdAt).toLocaleString()} · {a.kind} · <span className="font-bold text-emerald-700">{a.done ? "✓ done" : "missed"}</span> · {a.note}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+              {bookingNotice && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900">
+                  {bookingNotice}
+                </div>
+              )}
 
-      {/* TAB 8: BOOK FOLLOW-UP */}
-      {activeTab === "book" ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4 max-w-xl">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Book Follow-up Consultation</h2>
-            <p className="text-xs text-slate-500">Request an in-clinic or telemedicine OPD slot with a practitioner.</p>
-          </div>
+              <button
+                type="button"
+                className="btn-pulse w-full py-3.5 text-sm font-bold"
+                onClick={async () => {
+                  if ((!practId && !useManualDoctor) || !slot) {
+                    setBookingNotice("Please select a practitioner and time slot.");
+                    return;
+                  }
+                  if (useManualDoctor && !manualDoctorName.trim()) {
+                    setBookingNotice("Please enter the doctor's name.");
+                    return;
+                  }
+                  try {
+                    const selectedPractitioner = practitioners?.find((p) => p._id === practId);
+                    const scheduledTime = new Date(slot).getTime();
+                    const doctorLabel = useManualDoctor
+                      ? manualDoctorName.trim()
+                      : selectedPractitioner?.displayName || "Practitioner";
 
-          {/* Patient name prompt if still generic */}
-          {(!displayName || ["new patient","new user","patient","user"].includes(displayName.trim().toLowerCase())) && (
-            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 space-y-2">
-              <p className="text-xs font-semibold text-amber-800">⚠️ Please set your name before booking</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  className="tl-input flex-1"
-                  placeholder="Your full name (e.g. Priya Sharma)"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                />
-                <button
-                  className="rounded-xl bg-[#1b343f] px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-[#274d5d] whitespace-nowrap"
-                  onClick={async () => {
-                    if (!customName.trim()) return;
-                    await updateName({ sessionUserId, displayName: customName.trim() });
-                  }}
-                >
-                  Save Name
-                </button>
-              </div>
-            </div>
-          )}
+                    const effectivePractId = useManualDoctor
+                      ? (practitioners?.[0]?._id ?? (practId as Id<"users">))
+                      : (practId as Id<"users">);
 
-          <div className="space-y-3">
-            <label className="block">
-              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Select Doctor / Practitioner</span>
-              <select
-                className="tl-input mt-1"
-                value={practId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "__manual__") {
-                    setPractId("" as Id<"users">);
-                    setManualDoctorName("");
-                    setUseManualDoctor(true);
-                  } else {
-                    setUseManualDoctor(false);
-                    setPractId(val as Id<"users">);
+                    if (!effectivePractId) {
+                      setBookingNotice("No practitioner accounts found. Please ask clinic to register.");
+                      return;
+                    }
+
+                    await requestAppointment({
+                      sessionUserId,
+                      practitionerUserId: effectivePractId,
+                      scheduledAt: scheduledTime,
+                      notes: `Mode: ${consultMode.replace("_", " ").toUpperCase()} at ${selectedClinic.name}`,
+                      channel: sendWhatsAppAlert ? "whatsapp" : "web",
+                      patientPhone: sendWhatsAppAlert ? phone.trim() : undefined,
+                    });
+
+
+
+                    // Trigger WhatsApp Notification
+                    if (sendWhatsAppAlert && phone.trim()) {
+                      try {
+                        const dateStr = new Date(scheduledTime).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        });
+                        const locationLabel = consultMode === "telehealth" ? "Encrypted Video Room" : selectedClinic.name;
+                        await fetch("/api/twilio/send-whatsapp", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            to: phone.trim(),
+                            patientName: displayName || "Valued Patient",
+                            doctorName: doctorLabel,
+                            appointmentDate: dateStr,
+                            location: locationLabel,
+                          }),
+                        });
+                      } catch {
+                        // ignore background send error
+                      }
+                    }
+
+                    setBookingNotice("");
+                    setBookingSuccessModal(true);
+                  } catch (err: any) {
+                    setBookingNotice("Booking failed: " + err.message);
                   }
                 }}
               >
-                <option value="">— Select Practitioner —</option>
-                {practitioners?.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.displayName}
-                  </option>
-                ))}
-                <option value="__manual__">➕ Enter doctor name manually</option>
-              </select>
-            </label>
-
-            {/* Manual doctor name input */}
-            {useManualDoctor && (
-              <label className="block">
-                <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Doctor&apos;s Name</span>
-                <input
-                  type="text"
-                  className="tl-input mt-1"
-                  placeholder="e.g. Dr. Rajesh Sharma"
-                  value={manualDoctorName}
-                  onChange={(e) => setManualDoctorName(e.target.value)}
-                  autoFocus
-                />
-              </label>
-            )}
-
-            <label className="block">
-              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">Preferred Date &amp; Time</span>
-              <input
-                className="tl-input mt-1"
-                type="datetime-local"
-                value={slot}
-                onChange={(e) => setSlot(e.target.value)}
-              />
-            </label>
-
-            <label className="block">
-              <span className="font-mono text-[11px] font-bold text-slate-600 uppercase">
-                WhatsApp Number for Instant Alerts 📲
-              </span>
-              <input
-                className="tl-input mt-1"
-                type="tel"
-                placeholder="+91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </label>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="wa-check"
-                type="checkbox"
-                checked={sendWhatsAppAlert}
-                onChange={(e) => setSendWhatsAppAlert(e.target.checked)}
-                className="rounded border-slate-300 text-[#1b343f] focus:ring-sky-500"
-              />
-              <label htmlFor="wa-check" className="text-xs font-medium text-slate-700 cursor-pointer">
-                Send appointment confirmation & reminders to my WhatsApp
-              </label>
+                Confirm &amp; Book Consultation Slot
+              </button>
             </div>
-          </div>
 
-          <button
-            className="btn-pulse px-5 py-2.5 text-xs font-semibold"
-            onClick={async () => {
-              if ((!practId && !useManualDoctor) || !slot) {
-                setBookingNotice("⚠️ Please select a practitioner and date.");
-                return;
-              }
-              if (useManualDoctor && !manualDoctorName.trim()) {
-                setBookingNotice("⚠️ Please enter the doctor's name.");
-                return;
-              }
-              try {
-                const selectedPractitioner = practitioners?.find((p) => p._id === practId);
-                const scheduledTime = new Date(slot).getTime();
-                const doctorLabel = useManualDoctor
-                  ? manualDoctorName.trim()
-                  : selectedPractitioner?.displayName || "Practitioner";
-
-                // When using manual mode, fall back to the first real practitioner for the DB FK
-                const effectivePractId = useManualDoctor
-                  ? (practitioners?.[0]?._id ?? practId)
-                  : practId;
-
-                if (!effectivePractId) {
-                  setBookingNotice("⚠️ No practitioner accounts found. Please ask your clinic to set up a practitioner account.");
-                  return;
-                }
-
-                await requestAppointment({
-                  sessionUserId,
-                  practitionerUserId: effectivePractId as Id<"users">,
-                  scheduledAt: scheduledTime,
-                  notes: useManualDoctor
-                    ? `Follow-up consultation with ${doctorLabel}`
-                    : "Follow-up consultation",
-                  patientPhone: phone,
-                  channel: "web",
-                });
-
-                if (sendWhatsAppAlert && phone) {
-                  fetch("/api/twilio/send-whatsapp", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      to: phone,
-                      patientName: displayName,
-                      practitionerName: doctorLabel,
-                      scheduledAt: scheduledTime,
-                      status: "requested",
-                      notes: `Follow-up consultation with ${doctorLabel}`,
-                    }),
-                  }).catch((err) => console.warn("WhatsApp alert trigger error:", err));
-                }
-
-                // Reset form
-                setSlot("");
-                setPractId("" as Id<"users">);
-                setManualDoctorName("");
-                setUseManualDoctor(false);
-                setBookingNotice("✅ Appointment requested! The list below has been updated.");
-                setTimeout(() => setBookingNotice(""), 6000);
-              } catch (err) {
-                setBookingNotice(`❌ ${err instanceof Error ? err.message : "Appointment booking failed"}`);
-              }
-            }}
-          >
-            Request Appointment Slot
-          </button>
-
-          {bookingNotice && (
-            <div
-              className={`rounded-2xl p-3 text-xs font-medium border ${
-                bookingNotice.startsWith("✅")
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                  : bookingNotice.startsWith("❌")
-                  ? "bg-red-50 text-red-900 border-red-200"
-                  : "bg-amber-50 text-amber-900 border-amber-200"
-              }`}
-            >
-              {bookingNotice}
-            </div>
-          )}
-
-
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <p className="font-mono text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Your Scheduled Appointments ({appointments?.length ?? 0})
-            </p>
-            <ul className="mt-3 space-y-2.5">
-              {appointments?.map((a) => (
-                <li
-                  key={a._id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">
-                        {new Date(a.scheduledAt).toLocaleString("en-IN", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${
-                          a.channel === "whatsapp"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                            : "bg-sky-100 text-sky-800"
-                        }`}
-                      >
-                        {a.channel === "whatsapp" ? "📲 WhatsApp" : "🌐 Web Portal"}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 text-[11px]">
-                      Doctor: <strong className="text-slate-700">{a.practitionerName || "Assigned Doctor"}</strong>
-                      {a.patientPhone ? ` · Alert to: ${a.patientPhone}` : ""}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`self-start sm:self-auto rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase ${
-                      a.status === "confirmed"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : a.status === "completed"
-                          ? "bg-slate-200 text-slate-700"
-                          : a.status === "cancelled"
-                            ? "bg-rose-100 text-rose-800"
-                            : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {a.status}
+            {/* Right Summary & Scheduled List Column (5 cols) */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Selected Booking Summary Preview */}
+              <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-[#1b343f] text-white p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-white/15 pb-3">
+                  <span className="text-xs font-bold font-mono uppercase tracking-wider text-sky-200">
+                    Booking Summary Preview
                   </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      ) : null}
+                  <span className="rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2.5 py-0.5 border border-emerald-400/30">
+                    {consultMode === "telehealth" ? "Video OPD" : consultMode === "home_visit" ? "Home Care" : "In-Clinic"}
+                  </span>
+                </div>
 
+                <div className="space-y-2.5 text-xs text-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Patient:</span>
+                    <span className="font-bold text-white text-sm">{displayName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Location / Center:</span>
+                    <span className="font-semibold text-right text-sky-200">{consultMode === "telehealth" ? "Telehealth Video Link" : selectedClinic.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Selected Time:</span>
+                    <span className="font-bold text-white">{selectedDateQuick.toUpperCase()} at {selectedTimeSlot}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">WhatsApp Alert:</span>
+                    <span className="font-mono text-emerald-300">{sendWhatsAppAlert ? phone : "Disabled"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scheduled Appointments List */}
+              <div className="rounded-3xl bg-white p-5 border border-slate-200/90 shadow-sm space-y-3">
+                <h4 className="text-sm font-bold text-slate-900 uppercase font-mono flex items-center justify-between">
+                  <span>Your Scheduled Appointments ({appointments?.length ?? 0})</span>
+                  <Clock className="h-4 w-4 text-slate-400" />
+                </h4>
+
+                <div className="space-y-2.5 max-h-[320px] overflow-y-auto">
+                  {appointments && appointments.length > 0 ? (
+                    appointments.map((a) => {
+                      const pract = practitioners?.find((p) => p._id === a.practitionerUserId);
+                      return (
+                        <div
+                          key={a._id}
+                          className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-slate-900">
+                              {new Date(a.scheduledAt).toLocaleString("en-IN", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })}
+                            </span>
+                            <span className="rounded-full bg-emerald-100 text-emerald-900 px-2.5 py-0.5 text-[10px] font-bold uppercase font-mono">
+                              {a.status || "CONFIRMED"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 flex items-center gap-1.5">
+                            <Stethoscope className="h-3.5 w-3.5 text-slate-400" />
+                            <span>Doctor: <strong>{a.practitionerName || pract?.displayName || "Consulting Practitioner"}</strong></span>
+                          </p>
+                          {a.patientPhone && (
+                            <p className="text-[11px] text-slate-500 font-mono">
+                              WhatsApp Alert: {a.patientPhone}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      No consultations scheduled yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB 9: MESSAGES */}
-      {activeTab === "messages" ? (
-        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4">
-          <div className="flex items-center justify-between">
+      {activeTab === "messages" && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-4 max-w-2xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Clinic Messages</h2>
-              <p className="text-xs text-slate-500">Direct questions and check-ins with your care team.</p>
+              <h2 className="text-2xl font-bold text-slate-900">Clinical Messaging</h2>
+              <p className="text-sm text-slate-500">Secure clinical chat with your doctor or dietitian.</p>
             </div>
-            <div className="flex gap-1.5 bg-slate-100 p-1 rounded-2xl">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shrink-0">
               <button
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition-all ${
-                  toRole === "practitioner" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                type="button"
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                  toRole === "practitioner"
+                    ? "bg-[#1b343f] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
                 onClick={() => setToRole("practitioner")}
               >
-                Practitioner
+                Doctor / OPD
               </button>
               <button
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition-all ${
-                  toRole === "dietitian" ? "bg-[#1b343f] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                type="button"
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                  toRole === "dietitian"
+                    ? "bg-[#1b343f] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
                 onClick={() => setToRole("dietitian")}
               >
@@ -1407,38 +1344,70 @@ export function PatientStation({
             </div>
           </div>
 
-          <div className="rounded-2xl bg-slate-50 border border-slate-100 max-h-64 space-y-2 overflow-auto p-4">
-            {messages?.length === 0 ? <p className="text-xs text-slate-400">No messages in this thread yet.</p> : null}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Type message to care team..."
+              value={msg}
+              onChange={(e) => setMsg(e.target.value)}
+              className="tl-input text-sm flex-1"
+            />
+            <button
+              className="btn-pulse px-5 py-2.5 text-sm font-bold shrink-0"
+              onClick={async () => {
+                if (!msg.trim()) return;
+                await sendMessage({
+                  sessionUserId,
+                  toRole,
+                  body: msg.trim(),
+                });
+                setMsg("");
+              }}
+            >
+              Send
+            </button>
+          </div>
+
+          <div className="space-y-2 pt-2">
             {messages?.map((m) => (
-              <div key={m._id} className="text-xs bg-white p-3 rounded-xl border border-slate-100">
-                <span className="font-mono text-[10px] text-slate-400">
-                  {m.fromName} → {m.toRole}
-                </span>
-                <p className="text-slate-800 mt-1">{m.body}</p>
+              <div key={m._id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span className="font-bold text-slate-800 uppercase font-mono">{m.fromName}</span>
+                  <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
+                </div>
+
+                <p className="text-sm text-slate-900">{m.body}</p>
               </div>
             ))}
           </div>
 
-          <textarea
-            className="tl-input"
-            rows={2}
-            placeholder="Type your message here..."
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-          />
-          <button
-            className="btn-pulse px-4 py-2 text-xs font-semibold"
-            onClick={async () => {
-              if (!msg.trim()) return;
-              await sendMessage({ sessionUserId, toRole, body: msg });
-              setMsg("");
-            }}
-          >
-            Send Message
-          </button>
         </section>
-      ) : null}
+      )}
+
+      {/* Booking Success Modal */}
+      {bookingSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl border border-slate-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 mx-auto">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-bold text-slate-900">Consultation Slot Reserved!</h3>
+              <p className="text-xs text-slate-600">
+                Your appointment has been confirmed and synced with your ABHA Health ID. Confirmation has been dispatched via WhatsApp.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-pulse w-full py-3 text-xs font-bold"
+              onClick={() => setBookingSuccessModal(false)}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

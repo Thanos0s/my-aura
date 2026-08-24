@@ -338,7 +338,7 @@ export function DocumentPipelinePanel({
                   <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#1b343f] to-teal-700 text-white text-base shadow-xs">
-                        🤖
+                        
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -366,7 +366,7 @@ export function DocumentPipelinePanel({
                   {/* Friendly Bot Speech Bubble */}
                   <div className="rounded-2xl bg-sky-50/70 p-3.5 border border-sky-100/80">
                     <p className="text-xs text-sky-950 font-medium leading-relaxed">
-                      💬 <em>&quot;Here is the simple breakdown of the document you uploaded:&quot;</em>
+                       <em>&quot;Here is the simple breakdown of the document you uploaded:&quot;</em>
                     </p>
 
                     {/* Point-wise detected items */}
@@ -388,7 +388,7 @@ export function DocumentPipelinePanel({
                     <div className="rounded-2xl bg-emerald-50/70 p-3.5 border border-emerald-100 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                          💊 Prescribed Medications ({meta.medications.length})
+                           Prescribed Medications ({meta.medications.length})
                         </p>
                         {meta.doctor_details?.name && (
                           <span className="text-[10px] text-emerald-700 font-medium">
@@ -410,7 +410,7 @@ export function DocumentPipelinePanel({
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
                               {med.frequency && <span>⏰ {med.frequency}</span>}
-                              {med.duration && <span>🗓️ {med.duration}</span>}
+                              {med.duration && <span> {med.duration}</span>}
                               {med.instructions && <span className="text-emerald-700 font-medium">ℹ️ {med.instructions}</span>}
                             </div>
                           </div>
@@ -441,7 +441,7 @@ export function DocumentPipelinePanel({
                     <div className="rounded-2xl bg-indigo-50/70 p-3.5 border border-indigo-100 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
-                          🔬 Lab Test Results ({meta.test_results.length})
+                           Lab Test Results ({meta.test_results.length})
                         </p>
                         {meta.lab_name && (
                           <span className="text-[10px] text-indigo-700 font-medium">{meta.lab_name}</span>
@@ -485,7 +485,7 @@ export function DocumentPipelinePanel({
                   {meta?.hospital_course_summary && (
                     <div className="rounded-2xl bg-amber-50/70 p-3.5 border border-amber-100 space-y-2.5">
                       <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                        🏥 Hospital Course & Discharge Summary
+                         Hospital Course & Discharge Summary
                       </p>
                       <div className="rounded-xl bg-white p-3 border border-amber-100 text-xs text-slate-700 leading-relaxed">
                         {meta.hospital_course_summary}
@@ -554,7 +554,7 @@ export function DocumentPipelinePanel({
                       {candidateMeds.length > 0 && (
                         <div>
                           <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            💊 Detected Medicines
+                             Detected Medicines
                           </p>
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {candidateMeds.map((med, i) => (
@@ -571,7 +571,7 @@ export function DocumentPipelinePanel({
                       {candidateLabs.length > 0 && (
                         <div>
                           <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            🔬 Detected Lab Values
+                             Detected Lab Values
                           </p>
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {candidateLabs.map((lab, i) => (
@@ -661,7 +661,7 @@ export function DocumentPipelinePanel({
                 {/* Detected Hints Section (Matching exact box styling in user screenshot) */}
                 <div className="mt-3">
                   <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                    💊 DETECTED RX HINTS:
+                     DETECTED RX HINTS:
                   </p>
                   <div className="mt-2 space-y-1.5">
                     {points.map((pt, i) => (

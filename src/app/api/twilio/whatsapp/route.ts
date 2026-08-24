@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       timeStyle: "short",
     });
 
-    const replyMsg = `✅ *My-Aura Appointment Confirmed!*\n\nHello ${result.patientName},\nYour appointment with *${result.practitionerName}* has been booked for:\n📅 *${dateStr}*\n📌 Status: *Pending Doctor Review*\n\nYour appointment is now live on your Patient Portal & Doctor OPD Dashboard.\nThank you!`;
+    const replyMsg = ` *My-Aura Appointment Confirmed!*\n\nHello ${result.patientName},\nYour appointment with *${result.practitionerName}* has been booked for:\n *${dateStr}*\n📌 Status: *Pending Doctor Review*\n\nYour appointment is now live on your Patient Portal & Doctor OPD Dashboard.\nThank you!`;
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     console.error("Twilio WhatsApp Webhook Error:", err);
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>⚠️ We received your message, but encountered an error processing your appointment. Please visit our website or try again shortly.</Message>
+  <Message> We received your message, but encountered an error processing your appointment. Please visit our website or try again shortly.</Message>
 </Response>`;
     return new Response(twiml, {
       status: 200,

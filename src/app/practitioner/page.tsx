@@ -397,7 +397,7 @@ function PractitionerApp() {
       <main className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
         {!detail ? (
           <div className="text-center py-16 text-slate-400">
-            <span className="text-3xl">🩺</span>
+            <span className="text-3xl"></span>
             <p className="mt-2 text-sm">Select a patient visit from the queue to start consultation.</p>
           </div>
         ) : viewMode === "pipeline" ? (
@@ -423,7 +423,7 @@ function PractitionerApp() {
                   className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={() => setViewMode("desk")}
                 >
-                  📋 Consultation Desk
+                   Consultation Desk
                 </button>
                 <button
                   type="button"
@@ -446,7 +446,7 @@ function PractitionerApp() {
           <>
             {detail.flags.some((f) => f.escalationStatus === "open") ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-xs">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700">⚠️ Red Flag Alert</p>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-rose-700"> Red Flag Alert</p>
                 {detail.flags.map((f) => (
                   <p key={f._id} className="mt-2 font-mono text-xs text-rose-950 flex items-center justify-between">
                     <span>{f.questionId}</span>
@@ -492,7 +492,7 @@ function PractitionerApp() {
                   }`}
                   onClick={() => setViewMode("desk")}
                 >
-                  📋 Consultation Desk
+                   Consultation Desk
                 </button>
                 <button
                   type="button"
@@ -772,7 +772,7 @@ function PractitionerApp() {
 
             {ocrBlocked ? (
               <div className="rounded border border-pulse bg-onyx/90 p-4 text-xs">
-                <p className="font-semibold text-warning">⚠️ Approval Gated on Document Review</p>
+                <p className="font-semibold text-warning"> Approval Gated on Document Review</p>
                 <p className="mt-1 text-mist">
                   Attached document extracts have pending reviews or low confidence scores. Confirm or correct them in the Document Pipeline panel on the right before finalizing this visit.
                 </p>

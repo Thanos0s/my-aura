@@ -135,7 +135,7 @@ function DietitianApp() {
       <main className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
         {!patientId ? (
           <div className="text-center py-16 text-slate-400">
-            <span className="text-3xl">🥗</span>
+            <span className="text-3xl"></span>
             <p className="mt-2 text-sm">Select a referred patient from the left panel.</p>
           </div>
         ) : (
@@ -224,7 +224,7 @@ function DietitianApp() {
                         disabled={structuringId === p._id || p.meals.length === 0}
                         onClick={() => handleStructurePlan(p)}
                       >
-                        {structuringId === p._id ? "Structuring…" : "✨ AI Structure Plan"}
+                        {structuringId === p._id ? "Structuring…" : " AI Structure Plan"}
                       </button>
                     </div>
                     <h4 className="font-bold text-xs text-slate-900 mt-1">{p.title}</h4>

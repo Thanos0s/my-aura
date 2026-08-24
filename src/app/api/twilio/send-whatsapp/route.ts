@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       timeStyle: "short",
     });
 
-    const messageText = `🏥 *My-Aura Health Clinic* 🏥\n\nHello *${patientName || "Patient"}*,\nYour appointment request has been confirmed:\n\n📅 *Date & Time*: ${formattedDate}\n👨‍⚕️ *Practitioner*: ${practitionerName || "Assigned Doctor"}\n📌 *Status*: ${(status || "Requested").toUpperCase()}\n💬 *Notes*: ${notes || "Follow-up consultation"}\n\n_Thank you for choosing My-Aura. Reply to this chat anytime to reschedule or view your plan!_`;
+    const messageText = ` *My-Aura Health Clinic* \n\nHello *${patientName || "Patient"}*,\nYour appointment request has been confirmed:\n\n *Date & Time*: ${formattedDate}\n👨‍⚕️ *Practitioner*: ${practitionerName || "Assigned Doctor"}\n📌 *Status*: ${(status || "Requested").toUpperCase()}\n *Notes*: ${notes || "Follow-up consultation"}\n\n_Thank you for choosing My-Aura. Reply to this chat anytime to reschedule or view your plan!_`;
 
     if (!authTokenOrSecret || (!accountSid && !apiKeySid)) {
       console.log("[Twilio Mock] WhatsApp message dispatched:", {

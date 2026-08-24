@@ -43,7 +43,7 @@ export function LandingPage() {
 
         <div className="relative z-10 max-w-3xl space-y-4">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1 text-xs font-semibold backdrop-blur-md text-sky-100">
-            <span>🌿</span> PS 26047 · Ministry of AYUSH / AIIA
+            <span></span> PS 26047 · Ministry of AYUSH / AIIA
           </span>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight text-white">
             Ayurvedic OPD Case Taking & Clinical Station
@@ -58,7 +58,7 @@ export function LandingPage() {
                 href={HOME_FOR[session.role] ?? "/patient"}
                 className="rounded-full bg-white hover:bg-slate-100 !text-[#18313c] px-6 py-3 text-xs font-extrabold shadow-md transition-all inline-flex items-center justify-center gap-1.5"
               >
-                <span>🌿</span> Go to My {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
+                <span></span> Go to My {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
               </Link>
             ) : (
               <Link
@@ -84,7 +84,7 @@ export function LandingPage() {
               href="/kiosk"
               className="rounded-full bg-emerald-500 hover:bg-emerald-600 !text-white px-6 py-3 text-xs font-bold shadow-md transition-all inline-flex items-center justify-center"
             >
-              Walk-up Kiosk 🌿
+              Walk-up Kiosk 
             </Link>
           </div>
 

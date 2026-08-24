@@ -256,7 +256,7 @@ export function LoginPanel({
     return (
       <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm">
-          <span className="text-2xl">🌿</span>
+          <span className="text-2xl"></span>
         </div>
         <div>
           <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Authenticated Session</p>
