@@ -218,10 +218,22 @@ export const ensureFromFirebase = mutation({
         patchData.displayName = args.displayName.trim();
       }
 
+      if (args.intendedRole === "patient" && !existing.patientId) {
+        const patientId = await ctx.db.insert("patients", {
+          displayName: patchData.displayName || existing.displayName,
+          languageCode: "en-IN",
+          createdAt: Date.now(),
+        });
+        patchData.patientId = patientId;
+        patchData.role = "patient";
+        await ctx.db.patch(patientId, { userId: existing._id });
+      }
+
       await ctx.db.patch(existing._id, patchData);
       if (patchData.displayName && existing.patientId) {
         await ctx.db.patch(existing.patientId, { displayName: patchData.displayName });
       }
+
 
       const updated = await ctx.db.get(existing._id);
       if (!updated) throw new Error("User not found");
