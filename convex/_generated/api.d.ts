@@ -12,6 +12,7 @@ import type * as adminOps from "../adminOps.js";
 import type * as auth from "../auth.js";
 import type * as clinical from "../clinical.js";
 import type * as consultations from "../consultations.js";
+import type * as consultationsQueries from "../consultationsQueries.js";
 import type * as diet from "../diet.js";
 import type * as documents from "../documents.js";
 import type * as firebaseAuth from "../firebaseAuth.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   clinical: typeof clinical;
   consultations: typeof consultations;
+  consultationsQueries: typeof consultationsQueries;
   diet: typeof diet;
   documents: typeof documents;
   firebaseAuth: typeof firebaseAuth;

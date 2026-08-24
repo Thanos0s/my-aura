@@ -4,3 +4,5 @@ export * from "./clustering";
 export * from "./buffers";
 export * from "./vrp";
 export * from "./emergencyInsert";
+export * from "./osrm";
+

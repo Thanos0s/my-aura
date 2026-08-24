@@ -1,13 +1,12 @@
-import { mutation, query } from "./_generated/server";
+import { action, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireRole } from "./lib/rbac";
-import {
-  buildQueue,
-  insertEmergency,
-  createHaversineDistanceProvider,
-} from "../src/lib/routing";
-import { DEFAULT_CONSTRAINTS, type ConsultationRequest, type QueueEntry } from "../src/lib/routing/types";
-import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import { buildQueue } from "../src/lib/routing/vrp";
+import { insertEmergency } from "../src/lib/routing/emergencyInsert";
+import { createHybridDistanceProvider } from "../src/lib/routing/osrm";
+import { DEFAULT_CONSTRAINTS, type ConsultationRequest, type GeoPoint, type QueueEntry } from "../src/lib/routing/types";
+import type { Id } from "./_generated/dataModel";
 
 const session = { sessionUserId: v.union(v.id("users"), v.string()) };
 
@@ -122,16 +121,52 @@ const queueEntryReturn = v.object({
   bufferMinutes: v.number(),
 });
 
+interface DoctorQueueEntry {
+  appointmentId: Id<"appointments">;
+  patientId: Id<"patients">;
+  patientName: string;
+  practitionerUserId: Id<"users">;
+  address: string;
+  pinCode: string;
+  consultationType: "HOME_VISIT" | "CLINIC_OPD" | "TELECONSULT";
+  urgency: "ROUTINE" | "PRIORITY" | "EMERGENCY";
+  sequenceIndex: number;
+  zoneId: string;
+  estimatedArrivalAt: number;
+  estimatedDepartureAt: number;
+  travelFromPreviousMinutes: number;
+  distanceFromPreviousKm: number;
+  bufferMinutes: number;
+}
+
+interface DoctorQueueResult {
+  queue: DoctorQueueEntry[];
+  overflow: Array<{
+    appointmentId: Id<"appointments">;
+    patientId: Id<"patients">;
+    patientName: string;
+    reason: string;
+  }>;
+  legacyCount: number;
+  distanceSource: "osrm" | "haversine";
+}
+
 /**
  * Doctor-facing dispatch endpoint (backs GET /api/doctor/queue). The queue
- * is computed fresh on every read from whatever `appointments` currently
+ * is computed fresh on every call from whatever `appointments` currently
  * exist for the day — cancellations and edits just disappear on the next
- * call, no separately-stored queue state to go stale. Geo-tagged requests
- * are clustered + TSP-sequenced; EMERGENCY requests are inserted at their
- * minimum-detour slot; legacy (non-geo) bookings are appended by their
- * original scheduledAt so old-style bookings still show up.
+ * call, no separately-stored queue state to go stale.
+ *
+ * This is an action (not a query) because building the driving-distance
+ * matrix calls out to OSRM's `/table/v1/driving` endpoint over HTTP, and
+ * only actions can make network calls in Convex. `OSRM_BASE_URL` must be
+ * set via `npx convex env set OSRM_BASE_URL https://your-osrm-host` for a
+ * self-hosted OSRM instance to be used; if it's unset, or the request
+ * fails/times out, this transparently falls back to the haversine-based
+ * estimator (`src/lib/routing/distance.ts`) so the queue is never blocked
+ * on OSRM being up.
  */
-export const getDoctorQueue = query({
+export const getDoctorQueue = action({
   args: {
     practitionerUserId: v.id("users"),
     /** Midnight epoch ms for the day being scheduled. */
@@ -148,29 +183,16 @@ export const getDoctorQueue = query({
       })
     ),
     legacyCount: v.number(),
+    distanceSource: v.union(v.literal("osrm"), v.literal("haversine")),
   }),
-  handler: async (ctx, args) => {
-    const dayEnd = args.dayStart + 24 * 60 * 60 * 1000;
-    const rows = await ctx.db
-      .query("appointments")
-      .withIndex("by_practitioner", (q) => q.eq("practitionerUserId", args.practitionerUserId))
-      .filter((q) =>
-        q.and(
-          q.or(q.eq(q.field("status"), "requested"), q.eq(q.field("status"), "confirmed")),
-          q.gte(q.field("scheduledAt"), args.dayStart),
-          q.lt(q.field("scheduledAt"), dayEnd)
-        )
-      )
-      .collect();
+  handler: async (ctx, args): Promise<DoctorQueueResult> => {
+    const rows = await ctx.runQuery(internal.consultationsQueries.listQueueCandidates, {
+      practitionerUserId: args.practitionerUserId,
+      dayStart: args.dayStart,
+    });
 
-    const patients = new Map<Id<"patients">, Doc<"patients">>();
-    for (const row of rows) {
-      if (!patients.has(row.patientId)) {
-        const p = await ctx.db.get(row.patientId);
-        if (p) patients.set(row.patientId, p);
-      }
-    }
-    const patientName = (id: Id<"patients">) => patients.get(id)?.displayName ?? "Patient";
+    const patientName = (id: Id<"patients">) =>
+      rows.find((r) => r.patientId === id)?.patientName ?? "Patient";
 
     const geoTagged = rows.filter((r) => r.geo && r.consultationType && r.urgency);
     const legacy = rows.filter((r) => !(r.geo && r.consultationType && r.urgency));
@@ -183,7 +205,20 @@ export const getDoctorQueue = query({
       dayStart: args.dayStart,
       basePoint: routine[0]?.geo ?? DEFAULT_CONSTRAINTS.basePoint,
     };
-    const provider = createHaversineDistanceProvider(constraints.avgSpeedKmh);
+
+    // Build the driving-distance matrix once, up front, for every point the
+    // optimizer might need a pairwise estimate between (base + every
+    // geo-tagged request, routine or emergency) — this is the "send
+    // filtered spatial coordinates to OSRM to build the exact driving
+    // matrix" step, done in a single batched /table call rather than one
+    // request per pair.
+    const allPoints: GeoPoint[] = [constraints.basePoint, ...geoTagged.map((r) => r.geo!)];
+    const osrmBaseUrl = process.env.OSRM_BASE_URL;
+    const { provider, source: distanceSource } = await createHybridDistanceProvider(
+      allPoints,
+      osrmBaseUrl,
+      constraints.avgSpeedKmh
+    );
 
     const toRequest = (row: (typeof rows)[number]): ConsultationRequest => ({
       id: row._id,
@@ -238,6 +273,7 @@ export const getDoctorQueue = query({
         reason: "Exceeds daily patient cap or working hours — needs rescheduling to another day.",
       })),
       legacyCount: legacy.length,
+      distanceSource,
     };
   },
 });
