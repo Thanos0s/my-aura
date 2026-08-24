@@ -95,17 +95,20 @@ export function LoginPanel({
   const [busy, setBusy] = useState(false);
   const [usePin, setUsePin] = useState(!firebaseOn);
 
-  // If already logged in, automatically redirect to dashboard
+  // If already logged in, only auto-redirect if the session matches the station's allowed role!
   useEffect(() => {
     if (session?.userId && session?.role) {
-      const dest = HOME_FOR[session.role];
-      const timer = setTimeout(() => {
-        router.replace(dest);
-      }, 50);
-      return () => clearTimeout(timer);
+      if (roleAllowedAtStation(session.role, station)) {
+        const dest = HOME_FOR[session.role];
+        const timer = setTimeout(() => {
+          router.replace(dest);
+        }, 150);
+        return () => clearTimeout(timer);
+      }
     }
     return undefined;
-  }, [session, router]);
+  }, [session, station, router]);
+
 
 
 
@@ -253,40 +256,80 @@ export function LoginPanel({
 
   if (session?.userId && session?.role) {
     const dest = HOME_FOR[session.role];
+    const isMatchingStation = roleAllowedAtStation(session.role, station);
+
+    if (isMatchingStation) {
+      return (
+        <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm font-bold text-xl">
+            ✓
+          </div>
+          <div>
+            <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Active Session</p>
+            <h2 className="text-xl font-bold text-slate-900 mt-1">Already Logged In</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              You are signed in as <strong className="text-slate-800">{session.displayName}</strong> ({session.role}).
+            </p>
+            <p className="font-mono text-[11px] text-sky-700 mt-1">
+              Redirecting to your dashboard…
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col gap-2">
+            <Link href={dest} className="btn-pulse py-2.5 text-xs font-bold w-full text-center">
+              Go to {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
+            </Link>
+            <button
+              type="button"
+              className="btn-ghost py-2 text-xs font-semibold w-full"
+              onClick={() => {
+                void signOutFirebase();
+                clearSession();
+                router.refresh();
+              }}
+            >
+              Sign out & switch account
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Active session is for a different role (e.g. practitioner while visiting /login/patient)
     return (
-      <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm">
-          <span className="text-2xl"></span>
+      <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-amber-200/90 max-w-lg mx-auto space-y-4 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-900 shadow-sm font-bold text-xl">
+          !
         </div>
         <div>
-          <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Authenticated Session</p>
-          <h2 className="text-xl font-bold text-slate-900 mt-1">Already Logged In</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            You are signed in as <strong className="text-slate-800">{session.displayName}</strong> ({session.role}).
+          <p className="font-mono text-[10px] uppercase font-bold text-amber-800">Different Role Active</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">Switch to {copy.title}</h2>
+          <p className="text-xs text-slate-600 mt-1">
+            You are currently signed in as <strong className="text-slate-800">{session.displayName}</strong> (<span className="font-semibold text-amber-900">{session.role}</span>).
           </p>
-          <p className="font-mono text-[11px] text-sky-700 mt-1">
-            Taking you to your dashboard…
+          <p className="text-xs text-slate-500 mt-1">
+            To sign into the <strong className="text-slate-700">{copy.title}</strong>, please sign out of your {session.role} session.
           </p>
         </div>
         <div className="pt-2 flex flex-col gap-2">
-          <Link href={dest} className="btn-pulse py-2.5 text-xs font-bold w-full text-center">
-            Go to {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard →
-          </Link>
           <button
             type="button"
-            className="btn-ghost py-2 text-xs font-semibold w-full"
+            className="btn-pulse py-2.5 text-xs font-bold w-full"
             onClick={() => {
               void signOutFirebase();
               clearSession();
               router.refresh();
             }}
           >
-            Sign out & switch account
+            Sign out & Enter {copy.title} →
           </button>
+          <Link href={dest} className="btn-ghost py-2 text-xs font-semibold w-full text-center">
+            Return to {session.role.charAt(0).toUpperCase() + session.role.slice(1)} Dashboard
+          </Link>
         </div>
       </div>
     );
   }
+
 
   return (
     <form

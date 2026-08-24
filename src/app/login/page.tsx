@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useAuraSession } from "@/components/useAuraSession";
 import { HOME_FOR } from "@/lib/auth/siteFlow";
 import { clearSession } from "@/lib/auth/session";
 import { signOutFirebase } from "@/lib/firebase/client";
+
 
 const GATES = [
   {
@@ -39,16 +39,6 @@ export default function LoginHubPage() {
   const router = useRouter();
   const session = useAuraSession();
 
-  useEffect(() => {
-    if (session?.userId && session?.role) {
-      const dest = HOME_FOR[session.role];
-      const timer = setTimeout(() => {
-        router.replace(dest);
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [session, router]);
 
 
   return (
