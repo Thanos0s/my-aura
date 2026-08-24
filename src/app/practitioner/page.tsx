@@ -8,8 +8,10 @@ import { convexConfigured } from "@/app/providers";
 import { buildFhirBundle } from "@/lib/fhir/bundle";
 import { extractBlocksApprove, type DocumentKind } from "@/lib/documents/metadata";
 import { DocumentPipelinePanel } from "@/components/DocumentPipelinePanel";
+import { DoctorDispatchPanel } from "@/components/DoctorDispatchPanel";
 import {
   canCompleteIntake,
+
   DASHAVIDHA_FACTORS,
   normalizeDashavidha,
   type IntakeState,
@@ -63,7 +65,8 @@ function PractitionerApp() {
   const setAppt = useMutation(api.clinical.setAppointmentStatus);
   const sendMessage = useMutation(api.messaging.sendMessage);
   const updateName = useMutation(api.auth.updateProfileName);
-  const [viewMode, setViewMode] = useState<"split" | "desk" | "pipeline">("split");
+  const [viewMode, setViewMode] = useState<"split" | "desk" | "pipeline" | "dispatch">("split");
+
   const [notice, setNotice] = useState("");
   const [note, setNote] = useState("");
   const [careTitle, setCareTitle] = useState("Care plan");
@@ -302,7 +305,23 @@ function PractitionerApp() {
 
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Patients</p>
+          <button
+            className={`w-full mb-3 rounded-2xl border p-2.5 text-left text-xs font-bold transition-all flex items-center justify-between shadow-xs ${
+              viewMode === "dispatch"
+                ? "bg-teal-700 text-white border-teal-700"
+                : "border-teal-200/90 bg-teal-50/80 text-teal-900 hover:bg-teal-100/90"
+            }`}
+            onClick={() => setViewMode("dispatch")}
+          >
+            <span className="flex items-center gap-1.5">
+              <span>🚗</span>
+              <span>Route Dispatch (VRP)</span>
+            </span>
+            <span className="rounded-full bg-teal-600/30 px-1.5 py-0.5 text-[9px] font-mono">LIVE</span>
+          </button>
+
           <ul className="space-y-1.5">
+
             {patients?.map((p) => (
               <li key={p.patientId}>
                 <button
@@ -395,10 +414,60 @@ function PractitionerApp() {
 
       {/* Center Column: Clinical Consultation Desk */}
       <main className="rounded-3xl bg-white p-6 md:p-8 shadow-sm border border-slate-100/90 space-y-6 min-w-0">
-        {!detail ? (
-          <div className="text-center py-16 text-slate-400">
-            <span className="text-3xl"></span>
-            <p className="mt-2 text-sm">Select a patient visit from the queue to start consultation.</p>
+        {viewMode === "dispatch" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">Home Care Dispatch</p>
+                <h2 className="mt-0.5 text-2xl font-bold text-slate-900">Route & Travel Optimization</h2>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  onClick={() => setViewMode("split")}
+                >
+                  🔲 3-Column Split
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  onClick={() => setViewMode("desk")}
+                >
+                  Consultation Desk
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  onClick={() => setViewMode("pipeline")}
+                >
+                  📄 Document Pipeline & OCR
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold bg-[#1b343f] text-white shadow-xs"
+                  onClick={() => setViewMode("dispatch")}
+                >
+                  🚗 Route Dispatch (VRP)
+                </button>
+              </div>
+            </div>
+            {sessionUserId ? (
+              <DoctorDispatchPanel practitionerUserId={sessionUserId} />
+            ) : (
+              <p className="text-xs text-slate-500">Sign in to load doctor routing queue.</p>
+            )}
+          </div>
+        ) : !detail ? (
+          <div className="text-center py-16 text-slate-400 space-y-3">
+            <span className="text-3xl">🩺</span>
+            <p className="text-sm">Select a patient visit from the queue to start consultation, or open Route Dispatch.</p>
+            <button
+              onClick={() => setViewMode("dispatch")}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-teal-800 transition-colors"
+            >
+              🚗 Open Doctor Route Dispatch (VRP)
+            </button>
           </div>
         ) : viewMode === "pipeline" ? (
           <div className="space-y-4">
@@ -423,7 +492,7 @@ function PractitionerApp() {
                   className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                   onClick={() => setViewMode("desk")}
                 >
-                   Consultation Desk
+                  Consultation Desk
                 </button>
                 <button
                   type="button"
@@ -432,8 +501,16 @@ function PractitionerApp() {
                 >
                   📄 Document Pipeline & OCR ({detail.extracts.length})
                 </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  onClick={() => setViewMode("dispatch")}
+                >
+                  🚗 Route Dispatch (VRP)
+                </button>
               </div>
             </div>
+
 
             <DocumentPipelinePanel
               extracts={detail.extracts}
@@ -501,8 +578,16 @@ function PractitionerApp() {
                 >
                   📄 Document Pipeline & OCR ({detail.extracts.length})
                 </button>
+                <button
+                  type="button"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                  onClick={() => setViewMode("dispatch")}
+                >
+                  🚗 Route Dispatch (VRP)
+                </button>
               </div>
             </div>
+
 
             {viewMode === "desk" && (
               <div className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50/70 p-4">

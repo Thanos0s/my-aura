@@ -286,6 +286,16 @@ export const requestAppointment = mutation({
     channel: v.optional(
       v.union(v.literal("web"), v.literal("whatsapp"), v.literal("kiosk"))
     ),
+    geo: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    address: v.optional(v.string()),
+    pinCode: v.optional(v.string()),
+    consultationType: v.optional(
+      v.union(v.literal("HOME_VISIT"), v.literal("CLINIC_OPD"), v.literal("TELECONSULT"))
+    ),
+    urgency: v.optional(
+      v.union(v.literal("ROUTINE"), v.literal("PRIORITY"), v.literal("EMERGENCY"))
+    ),
+    estimatedConsultMinutes: v.optional(v.number()),
   },
   returns: v.id("appointments"),
   handler: async (ctx, args) => {
@@ -318,10 +328,17 @@ export const requestAppointment = mutation({
       notes: args.notes,
       channel: args.channel ?? "web",
       patientPhone: args.patientPhone,
+      geo: args.geo,
+      address: args.address,
+      pinCode: args.pinCode,
+      consultationType: args.consultationType,
+      urgency: args.urgency,
+      estimatedConsultMinutes: args.estimatedConsultMinutes,
       createdAt: Date.now(),
     });
   },
 });
+
 
 
 export const bookAppointmentFromWhatsApp = mutation({

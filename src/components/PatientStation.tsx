@@ -1179,6 +1179,13 @@ export function PatientStation({
                       return;
                     }
 
+                    const consultType =
+                      consultMode === "home_visit"
+                        ? "HOME_VISIT"
+                        : consultMode === "telehealth"
+                        ? "TELECONSULT"
+                        : "CLINIC_OPD";
+
                     await requestAppointment({
                       sessionUserId,
                       practitionerUserId: effectivePractId,
@@ -1186,7 +1193,14 @@ export function PatientStation({
                       notes: `Mode: ${consultMode.replace("_", " ").toUpperCase()} at ${selectedClinic.name}`,
                       channel: sendWhatsAppAlert ? "whatsapp" : "web",
                       patientPhone: sendWhatsAppAlert ? phone.trim() : undefined,
+                      geo: { lat: selectedClinic.lat, lng: selectedClinic.lng },
+                      address: selectedClinic.address,
+                      pinCode: "110016",
+                      consultationType: consultType,
+                      urgency: "ROUTINE",
+                      estimatedConsultMinutes: 25,
                     });
+
 
 
 

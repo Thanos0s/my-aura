@@ -27,6 +27,7 @@ const urgency = v.union(v.literal("ROUTINE"), v.literal("PRIORITY"), v.literal("
 export const requestConsultation = mutation({
   args: {
     ...session,
+    patientId: v.optional(v.id("patients")),
     practitionerUserId: v.id("users"),
     geo: v.object({ lat: v.number(), lng: v.number() }),
     address: v.string(),
@@ -41,8 +42,10 @@ export const requestConsultation = mutation({
   },
   returns: v.id("appointments"),
   handler: async (ctx, args) => {
-    const user = await requireRole(ctx, args.sessionUserId, ["patient"]);
-    if (!user.patientId) throw new Error("Patient record missing");
+    const user = await requireRole(ctx, args.sessionUserId, ["patient", "practitioner", "admin"]);
+    const targetPatientId = user.patientId ?? args.patientId;
+    if (!targetPatientId) throw new Error("Patient record missing");
+
 
     if (args.preferredWindowEnd <= args.preferredWindowStart) {
       throw new Error("preferredWindowEnd must be after preferredWindowStart");
@@ -60,12 +63,13 @@ export const requestConsultation = mutation({
     }
 
     if (args.patientPhone) {
-      await ctx.db.patch(user.patientId, { phoneNumber: args.patientPhone });
+      await ctx.db.patch(targetPatientId, { phoneNumber: args.patientPhone });
     }
 
     return await ctx.db.insert("appointments", {
-      patientId: user.patientId,
+      patientId: targetPatientId,
       practitionerUserId: practId,
+
       // scheduledAt is the queue engine's authoritative output, not a
       // patient pick — seed it with the preferred-window start until the
       // queue is (re)computed on the doctor's side.
