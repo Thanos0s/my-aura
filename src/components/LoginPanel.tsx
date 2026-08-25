@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useConvexAuth, useMutation } from "convex/react";
+import { Check, Sparkles } from "lucide-react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { api } from "../../convex/_generated/api";
@@ -262,7 +263,7 @@ export function LoginPanel({
       return (
         <div className="rounded-3xl bg-white p-7 md:p-8 shadow-md border border-slate-100/90 max-w-lg mx-auto space-y-4 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1b343f] to-[#366375] text-white shadow-sm font-bold text-xl">
-            ✓
+            <Check className="h-7 w-7" />
           </div>
           <div>
             <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Active Session</p>
@@ -497,7 +498,10 @@ export function LoginPanel({
             }
           }}
         >
-          🌱 Seed Demo Users (PIN: 1234)
+          <span className="flex items-center justify-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            Seed Demo Users (PIN: 1234)
+          </span>
         </button>
       </div>
 

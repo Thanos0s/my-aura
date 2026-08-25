@@ -14,6 +14,7 @@ import {
   Plus,
   Compass,
   ShieldCheck,
+  X,
 } from "lucide-react";
 
 interface DoctorDispatchPanelProps {
@@ -430,7 +431,7 @@ export function DoctorDispatchPanel({ practitionerUserId }: DoctorDispatchPanelP
                 onClick={() => setShowAddModal(false)}
                 className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 

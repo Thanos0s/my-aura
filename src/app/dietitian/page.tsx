@@ -7,6 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { convexConfigured } from "@/app/providers";
 import { RoleGate, useAuraSession } from "@/components/useAuraSession";
 import type { DietPlanExtraction } from "@/lib/diet/extract";
+import { CheckCircle2, Clock, Utensils } from "lucide-react";
 
 export default function DietitianPage() {
   if (!convexConfigured()) {
@@ -123,8 +124,18 @@ function DietitianApp() {
                 onClick={() => setPatientId(r.patientId)}
               >
                 <p className="font-semibold text-xs">{r.displayName}</p>
-                <span className={`block font-mono text-[10px] mt-0.5 ${patientId === r.patientId ? "text-slate-300" : "text-slate-400"}`}>
-                  {r.visitApproved ? "✓ Approved summary" : "⏳ Waiting doctor sign-off"}
+                <span className={`flex items-center gap-1 font-mono text-[10px] mt-0.5 ${patientId === r.patientId ? "text-slate-300" : "text-slate-400"}`}>
+                  {r.visitApproved ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                      <span>Approved summary</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3 text-amber-400 shrink-0" />
+                      <span>Waiting doctor sign-off</span>
+                    </>
+                  )}
                 </span>
               </button>
             </li>
@@ -287,8 +298,8 @@ function DietitianApp() {
                                         className="h-8 w-8 rounded-md object-cover shrink-0"
                                       />
                                     ) : (
-                                      <span className="h-8 w-8 rounded-md bg-slate-200 shrink-0 flex items-center justify-center text-[10px]">
-                                        🍽️
+                                      <span className="h-8 w-8 rounded-md bg-slate-100 text-slate-400 shrink-0 flex items-center justify-center">
+                                        <Utensils className="h-3.5 w-3.5" />
                                       </span>
                                     )}
                                     <span className="text-[11px] text-slate-700 leading-tight">

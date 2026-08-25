@@ -871,8 +871,12 @@ function PractitionerApp() {
                 </div>
               ))}
               {adherence?.map((a) => (
-                <p key={a._id} className="font-mono text-xs text-slate-600">
-                  {a.kind} · {a.note} · {a.done ? "✓ done" : "✕ missed"}
+                <p key={a._id} className="font-mono text-xs text-slate-600 flex items-center gap-1.5">
+                  <span className="font-semibold uppercase text-[10px] text-slate-500">{a.kind}:</span>
+                  <span>{a.note}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${a.done ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>
+                    {a.done ? "Done" : "Missed"}
+                  </span>
                 </p>
               ))}
             </section>

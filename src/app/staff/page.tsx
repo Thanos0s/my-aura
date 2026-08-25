@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { convexConfigured } from "@/app/providers";
+import { Check } from "lucide-react";
 
 export default function StaffPage() {
   if (!convexConfigured()) {
@@ -69,10 +70,11 @@ function StaffFlags({
       {detail.flags.map((f) => (
         <button
           key={f._id}
-          className="rounded-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 text-xs font-bold transition-all shadow-xs"
+          className="rounded-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
           onClick={() => void acknowledgeRedFlag({ eventId: f._id })}
         >
-          ✓ Acknowledge {f.questionId}
+          <Check className="h-3.5 w-3.5" />
+          <span>Acknowledge {f.questionId}</span>
         </button>
       ))}
     </div>

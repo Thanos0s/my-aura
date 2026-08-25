@@ -11,6 +11,7 @@ import {
   Search,
   Crosshair,
   ShieldCheck,
+  Check,
 } from "lucide-react";
 
 export interface ClinicLocation {
@@ -391,7 +392,13 @@ export function ClinicMapLocator({
                             : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                         }`}
                       >
-                        {isSelected ? "✓ Selected" : "Choose Center"}
+                        {isSelected ? (
+                          <span className="flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Selected
+                          </span>
+                        ) : (
+                          "Choose Center"
+                        )}
                       </button>
                     </div>
                   </div>

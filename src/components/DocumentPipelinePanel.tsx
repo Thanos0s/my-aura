@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { Check, ShieldCheck, Loader2, Camera, FolderUp, Bookmark, FileText, Edit2, CheckCircle2 } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   getConfidenceBadge,
@@ -183,7 +184,7 @@ export function DocumentPipelinePanel({
                         : "bg-slate-100 text-slate-400"
                   }`}
                 >
-                  {isCompleted ? "✓" : step.num}
+                  {isCompleted ? <Check className="h-3 w-3 inline" /> : step.num}
                 </span>
                 <div className="min-w-0 flex-1">
                   <span
@@ -215,7 +216,7 @@ export function DocumentPipelinePanel({
       {/* Safety Rail Guarantee Callout */}
       <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-4 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="text-sm">🛡️</span>
+          <ShieldCheck className="h-4 w-4 text-emerald-600 inline" />
           <p className="font-mono text-[11px] font-bold uppercase tracking-wider text-sky-900">
             Clinical Safety Guarantee
           </p>
@@ -267,12 +268,12 @@ export function DocumentPipelinePanel({
             >
               {isProcessing ? (
                 <div className="space-y-1">
-                  <span className="inline-block animate-spin text-sky-600 text-lg">⚙</span>
+                  <Loader2 className="h-4 w-4 animate-spin text-sky-600 inline" />
                   <p className="font-mono text-xs text-sky-700 font-bold">Processing OCR…</p>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <span className="text-base text-slate-500">📷 / 📁</span>
+                  <div className="flex items-center gap-1 text-slate-400"><Camera className="h-4 w-4" /><span className="text-xs">/</span><FolderUp className="h-4 w-4" /></div>
                   <p className="text-xs font-bold text-slate-800">Click to upload or snap photo</p>
                   <p className="font-mono text-[10px] text-slate-400">Sarvam Document AI / Tesseract fallback</p>
                 </div>
@@ -430,7 +431,7 @@ export function DocumentPipelinePanel({
 
                       {meta.follow_up_advice && (
                         <p className="text-[11px] text-emerald-900 bg-white/80 p-2 rounded-lg border border-emerald-100">
-                          📌 <strong>Follow-up:</strong> {meta.follow_up_advice}
+                          <Bookmark className="h-3.5 w-3.5 text-teal-600 inline mr-1" /> <strong>Follow-up:</strong> {meta.follow_up_advice}
                         </p>
                       )}
                     </div>
@@ -475,7 +476,7 @@ export function DocumentPipelinePanel({
 
                       {meta.interpretation_notes && (
                         <p className="text-[11px] text-indigo-900 bg-white/80 p-2 rounded-lg border border-indigo-100">
-                          📝 <strong>Interpretation:</strong> {meta.interpretation_notes}
+                          <FileText className="h-3.5 w-3.5 text-teal-600 inline mr-1" /> <strong>Interpretation:</strong> {meta.interpretation_notes}
                         </p>
                       )}
                     </div>
@@ -511,7 +512,7 @@ export function DocumentPipelinePanel({
                       )}
                       {meta.follow_up_instructions && (
                         <p className="text-[11px] text-amber-900 bg-white/80 p-2 rounded-lg border border-amber-100">
-                          📌 <strong>Instructions:</strong> {meta.follow_up_instructions}
+                          <Bookmark className="h-3.5 w-3.5 text-teal-600 inline mr-1" /> <strong>Instructions:</strong> {meta.follow_up_instructions}
                         </p>
                       )}
                     </div>
@@ -593,7 +594,7 @@ export function DocumentPipelinePanel({
                     <span className="text-slate-600">
                       Doctor Review:{" "}
                       <strong className={ex.reviewStatus === "confirmed" ? "text-emerald-700" : "text-amber-700"}>
-                        {ex.reviewStatus === "confirmed" ? "Verified by Doctor ✓" : "Pending Doctor Review"}
+                        {ex.reviewStatus === "confirmed" ? <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Verified by Doctor</span> : "Pending Doctor Review"}
                       </strong>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
@@ -725,7 +726,10 @@ export function DocumentPipelinePanel({
                       className="btn-pulse px-3.5 py-1 text-xs font-semibold"
                       onClick={() => void onReview(ex._id, "confirmed")}
                     >
-                      ✓ Confirm Extract
+                      <span className="flex items-center gap-1.5">
+                        <Check className="h-3.5 w-3.5" />
+                        Confirm Extract
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -734,7 +738,10 @@ export function DocumentPipelinePanel({
                         void onReview(ex._id, "corrected", draft)
                       }
                     >
-                      ✎ Save Correction
+                      <span className="flex items-center gap-1.5">
+                        <Edit2 className="h-3.5 w-3.5" />
+                        Save Correction
+                      </span>
                     </button>
                   </div>
                 )}

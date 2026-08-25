@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 
 export function FloatingTerminalButton() {
   const [active, setActive] = useState(false);
@@ -32,10 +33,10 @@ export function FloatingTerminalButton() {
             </div>
             <button
               type="button"
-              className="text-slate-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
               onClick={() => setActive(false)}
             >
-              ✕
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
 

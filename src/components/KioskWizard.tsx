@@ -30,6 +30,12 @@ import {
   Mic,
   ShieldAlert,
   Square,
+  Check,
+  X,
+  Camera,
+  FolderUp,
+  Paperclip,
+  CheckCircle2,
 } from "lucide-react";
 
 
@@ -694,7 +700,7 @@ export function KioskWizard({
                         : "bg-slate-200 text-slate-500"
                     }`}
                   >
-                    {isDone ? "✓" : step.num}
+                    {isDone ? <Check className="h-3 w-3 inline" /> : step.num}
                   </span>
                   {isCurrent && (
                     <span className="animate-pulse flex h-2 w-2 rounded-full bg-sky-400" />
@@ -714,8 +720,8 @@ export function KioskWizard({
       {message ? (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 flex items-center justify-between gap-3">
           <span>{message}</span>
-          <button onClick={() => setMessage("")} className="text-amber-700 font-bold hover:text-amber-900">
-            ✕
+          <button onClick={() => setMessage("")} className="text-amber-700 hover:text-amber-900 p-1">
+            <X className="h-4 w-4" />
           </button>
         </div>
       ) : null}
@@ -993,7 +999,7 @@ export function KioskWizard({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xl"></span>
-                      {state.pathway === "allopathic" && <span className="text-xs font-bold">Selected ✓</span>}
+                      {state.pathway === "allopathic" && <span className="text-xs font-bold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Selected</span>}
                     </div>
                     <p className="font-bold text-sm">Regular / Allopathic OPD</p>
                     <p className={`text-[11px] leading-relaxed ${state.pathway === "allopathic" ? "text-slate-200" : "text-slate-500"}`}>
@@ -1012,7 +1018,7 @@ export function KioskWizard({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xl"></span>
-                      {state.pathway === "ayush" && <span className="text-xs font-bold">Selected ✓</span>}
+                      {state.pathway === "ayush" && <span className="text-xs font-bold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Selected</span>}
                     </div>
                     <p className="font-bold text-sm">Ayurvedic OPD (AIIA-type)</p>
                     <p className={`text-[11px] leading-relaxed ${state.pathway === "ayush" ? "text-slate-200" : "text-slate-500"}`}>
@@ -1124,7 +1130,7 @@ export function KioskWizard({
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-[9px]">{String(i + 1).padStart(2, "0")}</span>
-                          {filled && <span className="text-emerald-700 font-bold">✓</span>}
+                          {filled && <Check className="h-3.5 w-3.5 text-emerald-700 inline" />}
                         </div>
                         <p className="font-bold mt-0.5">{factor.label}</p>
                         <p className={`text-[9px] line-clamp-1 mt-0.5 ${isCurrent ? "text-slate-200" : filled ? "text-emerald-800" : "text-slate-400"}`}>
@@ -1234,7 +1240,7 @@ export function KioskWizard({
                     className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 text-xs font-bold shadow-xs transition-colors"
                     onClick={() => stopRecordingEarly()}
                   >
-                    ✓ {state.languageCode.startsWith("hi") ? "पूरा हुआ (भेजें)" : "Done (Send)"}
+                    <span className="flex items-center justify-center gap-1.5"><Check className="h-4 w-4" /> {state.languageCode.startsWith("hi") ? "पूरा हुआ (भेजें)" : "Done (Send)"}</span>
                   </button>
                 </div>
               )}
@@ -1394,7 +1400,7 @@ export function KioskWizard({
 
             {/* Upload Area */}
             <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center space-y-2">
-              <span className="text-2xl">📸 / 📁</span>
+              <div className="flex items-center justify-center gap-2 text-slate-400"><Camera className="h-6 w-6" /><span className="text-sm">/</span><FolderUp className="h-6 w-6" /></div>
               <p className="text-xs font-bold text-slate-800">
                 Take photo or attach {docKind === "prescription" ? "Prescription" : docKind === "lab" ? "Lab Report" : "Discharge Summary"}
               </p>
@@ -1452,7 +1458,7 @@ export function KioskWizard({
                 className="btn-pulse w-full py-3 text-xs font-bold"
                 onClick={() => setState({ ...state, phase: "recap" })}
               >
-                {localDocs.length > 0 ? "✓ Proceed to AI Summary (" + localDocs.length + " attached) →" : "Skip Document Scan & Build Summary →"}
+                {localDocs.length > 0 ? "Proceed to AI Summary (" + localDocs.length + " attached) →" : "Skip Document Scan & Build Summary →"}
               </button>
             </div>
           </section>
@@ -1490,8 +1496,9 @@ export function KioskWizard({
             {/* Documents Timeline Overview */}
             {localDocs.length > 0 && (
               <div className="rounded-2xl bg-sky-50/60 p-3.5 border border-sky-100 space-y-1.5">
-                <p className="font-mono text-[10px] font-bold text-sky-900 uppercase tracking-wider">
-                  📎 Attached Documents ({localDocs.length})
+                <p className="font-mono text-[10px] font-bold text-sky-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Attached Documents ({localDocs.length})
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {localDocs.map((d, i) => (
@@ -1511,7 +1518,7 @@ export function KioskWizard({
               className="btn-pulse w-full py-3.5 text-xs font-bold"
               onClick={() => void finishRecap()}
             >
-              {isPatientView ? "✓ Confirm & Send to Clinic Doctor →" : "✓ Confirm Summary & Send to Doctor's OPD Desk →"}
+              {isPatientView ? "Confirm & Send to Clinic Doctor →" : "Confirm Summary & Send to Doctor's OPD Desk →"}
             </button>
           </section>
         )}
@@ -1522,13 +1529,13 @@ export function KioskWizard({
            ══════════════════════════════════════════════════════════════════════ */}
         {state.phase === "complete" && (
           <section className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90 space-y-6 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-2xl">
-              ✓
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+              <CheckCircle2 className="h-8 w-8" />
             </div>
 
             <div className="space-y-1">
               <span className="font-mono text-xs font-bold text-emerald-800 uppercase tracking-wider bg-emerald-50 px-2.5 py-0.5 rounded-full">
-                {isPatientView ? "✓ Intake Submitted Successfully" : "Step 05 · Ready for Doctor Examination"}
+                {isPatientView ? "Intake Submitted Successfully" : "Step 05 · Ready for Doctor Examination"}
               </span>
               <h2 className="text-2xl font-bold text-slate-900">
                 {isPatientView ? "Your Case Sheet is Submitted!" : "Your Case Sheet is Ready!"}
@@ -1570,7 +1577,7 @@ export function KioskWizard({
                   href="/patient"
                   className="btn-pulse w-full py-3 text-xs font-bold text-center block text-white"
                 >
-                  ✓ Back to My Patient Portal →
+                  Back to My Patient Portal →
                 </Link>
               ) : (
                 <Link
