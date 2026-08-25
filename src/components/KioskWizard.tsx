@@ -18,7 +18,6 @@ import { detectSarvamLanguageCode, SARVAM_LANGUAGES } from "@/lib/sarvam/languag
 
 import { clearOfflineVisit, saveOfflineVisit } from "@/lib/offline/cache";
 import type { DocumentExtractMeta, DocumentKind } from "@/lib/documents/metadata";
-import { DocumentPipelineRail, IntakePipelineRail } from "@/components/PipelineRails";
 import { computeRms, VAD_CONFIG, sanitizeForSpeech } from "@/lib/voice/vad";
 
 
@@ -121,9 +120,7 @@ export function KioskWizard({
 
   const [message, setMessage] = useState("");
   const [ocrNote, setOcrNote] = useState("");
-  const [extractLit, setExtractLit] = useState(false);
   const [docKind, setDocKind] = useState<DocumentKind>("prescription");
-  const [docStage, setDocStage] = useState<"idle" | "physical" | "ocr" | "meta" | "attach" | "review">("idle");
   const [localDocs, setLocalDocs] = useState<LocalDoc[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -232,8 +229,6 @@ export function KioskWizard({
 
 
 
-  const clinical = !["consent", "answeredBy", "pathway", "escalated"].includes(state.phase);
-
   async function persist(next: IntakeState, status?: "intake" | "awaiting_patient_confirm" | "escalated") {
     if (!adapters || !visitId) return;
     await adapters.saveIntake({
@@ -338,7 +333,6 @@ export function KioskWizard({
     const val = value.trim();
     if (!val) return;
     let next = state;
-    setExtractLit(true);
 
 
 
@@ -559,7 +553,6 @@ export function KioskWizard({
 
   async function onUpload(file: File) {
     setBusy(true);
-    setDocStage("ocr");
     try {
       const form = new FormData();
       form.set("file", file);
@@ -580,7 +573,6 @@ export function KioskWizard({
       } catch (err) {
         console.warn("Kiosk OCR fetch failed:", err);
       }
-      setDocStage("meta");
 
       const meta =
         result.structured ??
@@ -611,7 +603,6 @@ export function KioskWizard({
           structured: result.structured ?? meta,
         },
       ]);
-      setDocStage("attach");
 
       if (adapters && visitId && adapters.uploadDocument) {
         await adapters.uploadDocument({
@@ -624,7 +615,6 @@ export function KioskWizard({
           failed: result.failed,
         });
       }
-      setDocStage("review");
     } finally {
       setBusy(false);
     }
@@ -647,8 +637,6 @@ export function KioskWizard({
     }
     clearOfflineVisit();
   }
-
-  const reviewPending = localDocs.filter((d) => d.reviewRequired).length;
 
   const isPatientView = Boolean(boundProfile);
   const journeySteps = isPatientView ? PATIENT_STEPS : FIVE_STEP_JOURNEY;
@@ -727,19 +715,9 @@ export function KioskWizard({
       ) : null}
 
       {/* Main Container */}
-      {clinical ? (
-        <div className="grid gap-4 lg:grid-cols-[250px_1fr_250px]">
-          <IntakePipelineRail state={state} extractLit={extractLit} />
-          <div className="min-w-0">{renderMain()}</div>
-          <DocumentPipelineRail
-            stage={clinical ? (docStage === "idle" ? "physical" : docStage) : "idle"}
-            attached={localDocs.length}
-            reviewPending={reviewPending}
-          />
-        </div>
-      ) : (
-        renderMain()
-      )}
+      <div className="w-full">
+        {renderMain()}
+      </div>
     </div>
   );
 
@@ -1388,10 +1366,7 @@ export function KioskWizard({
                       ? "bg-[#1b343f] text-white border-[#1b343f] shadow-xs"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                   }`}
-                  onClick={() => {
-                    setDocKind(id);
-                    setDocStage("physical");
-                  }}
+                  onClick={() => setDocKind(id)}
                 >
                   {label}
                 </button>

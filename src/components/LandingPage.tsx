@@ -5,29 +5,10 @@ import { useAuraSession } from "@/components/useAuraSession";
 import { HOME_FOR } from "@/lib/auth/siteFlow";
 
 import {
-  CASE_SPINE,
   DASHAVIDHA_FACTORS,
-  DOCUMENT_STAGES,
   LANDING_FEATURES,
   LANDING_ROLES,
-  PIPELINE_STAGES,
 } from "@/lib/landing/features";
-
-function Rail({ steps }: { steps: readonly string[] }) {
-  return (
-    <ol className="mt-4 space-y-0">
-      {steps.map((step, i) => (
-        <li key={step} className="flex gap-3">
-          <div className="flex w-6 flex-col items-center">
-            <span className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-xs" />
-            {i < steps.length - 1 ? <span className="w-0.5 flex-1 bg-slate-200" /> : null}
-          </div>
-          <p className="pb-4 font-mono text-xs text-slate-700 font-medium">{step}</p>
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 export function LandingPage() {
   const session = useAuraSession();
@@ -115,24 +96,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Architecture Rails */}
-      <section className="grid gap-6 md:grid-cols-3">
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Architecture</p>
-          <h2 className="text-lg font-bold text-slate-900 mt-1">Signal Path</h2>
-          <Rail steps={PIPELINE_STAGES} />
-        </div>
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Case Spine</p>
-          <h2 className="text-lg font-bold text-slate-900 mt-1">Interview Order</h2>
-          <Rail steps={CASE_SPINE} />
-        </div>
-        <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-100/90">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Documents</p>
-          <h2 className="text-lg font-bold text-slate-900 mt-1">Physical OCR Pipeline</h2>
-          <Rail steps={DOCUMENT_STAGES} />
-        </div>
-      </section>
 
       {/* Dashavidha Factors */}
       <section className="space-y-6">
